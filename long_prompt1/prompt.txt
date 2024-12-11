@@ -1,0 +1,1 @@
+A cat holds a paper saying "Hello World”.
