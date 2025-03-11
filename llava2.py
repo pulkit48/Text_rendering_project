@@ -382,11 +382,12 @@ with open('eval_prompt2.txt') as f:
 data_generation2(type=2,prompt_list=prompt_list,external_df=None,index=2000)
 data_generation2(type=3,prompt_list=prompt_list,external_df=external_df,index=3000)
 
-final_df=pd.read_csv(output_csv,index=False)
-df_easy=final_df[["prompt", "win", "lose3"]]
-df_medium=final_df[["prompt", "win", "lose2"]]
-df_hard=final_df[["prompt", "win", "lose1"]]
+final_df = pd.read_csv(output_csv)  # Removed 'index=False' from read_csv
+df_easy = final_df[["prompt", "win", "lose3"]]
+df_medium = final_df[["prompt", "win", "lose2"]]
+df_hard = final_df[["prompt", "win", "lose1"]]
 
-df_easy.to_csv('df_easy.csv')
-df_medium.to_csv('df_medium.csv')
-df_hard.to_csv('df_hard.csv')
+df_easy.to_csv('df_easy.csv', index=False)
+df_medium.to_csv('df_medium.csv', index=False)
+df_hard.to_csv('df_hard.csv', index=False)
+
