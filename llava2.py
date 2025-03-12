@@ -8,6 +8,8 @@ from datasets import load_dataset
 import re
 import os
 import zipfile
+from concurrent.futures import ProcessPoolExecutor
+
 # import torch
 # from transformers import AutoProcessor, LlavaForConditionalGeneration
 # from transformers import BitsAndBytesConfig
@@ -155,7 +157,7 @@ def is_contrast_sufficient(bg_color, text_color, threshold=4.5):
     return contrast_ratio >= threshold
 
 
-def generate_random_contrasting_color(bg_color, max_attempts=100):
+def generate_random_contrasting_color(bg_color, max_attempts=20):
     """
     Generate a random text color that contrasts with the background color.
 
@@ -179,9 +181,7 @@ def paste_multiline_text(text, margin=20,input_image=None):
     image, _, text_color = create_plain_image()
     if input_image is not None:
       # image = input_image
-      image=Image.open(input_image)
-      image.save('temp.png',"PNG")
-      image=Image.open('temp.png')
+      image=Image.open(input_image).convert("RGB")
       image = image.resize((512, 512))
       image=np.array(image)
 
@@ -236,53 +236,54 @@ def data_generation1(type,prompt_list,external_df=None,index=0):
   st = set()
   distortion_list = [replace_with_random_chars, scramble_words, repeat_chars, drop_chars, shuffle_chars]
 
+  with ProcessPoolExecutor(max_workers=os.cpu_count()) as executor:
 
-  for i in range(num_samples):
-    print(i)
-    text = random.choice(prompt_list)
-    full_text=f'''An image with white background with text "{text}".'''
-    if(type==0):
-        input_image=None
-        image1= paste_multiline_text(text, margin=20,input_image=input_image)
-    elif type==1:
-        ind=random.choice(range(len(external_df)))
+    for i in range(num_samples):
+        print(i)
+        text = random.choice(prompt_list)
+        full_text=f'''An image with white background with text "{text}".'''
+        if(type==0):
+            input_image=None
+            image1= paste_multiline_text(text, margin=20,input_image=input_image)
+        elif type==1:
+            ind=random.choice(range(len(external_df)))
 
-        input_image=external_df['image'][ind]['path']
-        image1= paste_multiline_text(text, margin=20,input_image=input_image)
-        full_text=f'''An image with text "{text}" on background as {external_df['prompt'][ind]}'''
+            input_image=external_df['image'][ind]['path']
+            image1= paste_multiline_text(text, margin=20,input_image=input_image)
+            full_text=f'''An image with text "{text}" on background as {external_df['prompt'][ind]}'''
 
 
-      # Apply distortions and generate images with corresponding num_choices
-    text2,num_choices2=apply_distortions(text, distortion_list)
-    image2 = paste_multiline_text(text2, margin=20, input_image=input_image)
-    text3,num_choices3=apply_distortions(text, distortion_list)
-    image3= paste_multiline_text(text3, margin=20, input_image=input_image)
-    text4,num_choices4=apply_distortions(text, distortion_list)
-    image4 = paste_multiline_text(text4, margin=20, input_image=input_image)
+        # Apply distortions and generate images with corresponding num_choices
+        text2,num_choices2=apply_distortions(text, distortion_list)
+        image2 = paste_multiline_text(text2, margin=20, input_image=input_image)
+        text3,num_choices3=apply_distortions(text, distortion_list)
+        image3= paste_multiline_text(text3, margin=20, input_image=input_image)
+        text4,num_choices4=apply_distortions(text, distortion_list)
+        image4 = paste_multiline_text(text4, margin=20, input_image=input_image)
 
-    # Create a list of images and their num_choices
-    image_choices = [(image2, num_choices2), (image3, num_choices3), (image4, num_choices4)]
+        # Create a list of images and their num_choices
+        image_choices = [(image2, num_choices2), (image3, num_choices3), (image4, num_choices4)]
 
-    # Sort images by num_choices (ascending order: least → most)
-    image_choices.sort(key=lambda x: x[1])  # Sorting based on num_choices
+        # Sort images by num_choices (ascending order: least → most)
+        image_choices.sort(key=lambda x: x[1])  # Sorting based on num_choices
 
-    # Assign paths based on sorted order
-    if image1 and all(img[0] for img in image_choices):  # Ensure all images exist
-        win_path = f"final_dataset/win/{i+index}.png"
-        lose1_path = f"final_dataset/lose1/{i+index}.png"  # Least num_choices
-        lose2_path = f"final_dataset/lose2/{i+index}.png"  # Moderate num_choices
-        lose3_path = f"final_dataset/lose3/{i+index}.png"  # Highest num_choices
+        # Assign paths based on sorted order
+        if image1 and all(img[0] for img in image_choices):  # Ensure all images exist
+            win_path = f"final_dataset/win/{i+index}.png"
+            lose1_path = f"final_dataset/lose1/{i+index}.png"  # Least num_choices
+            lose2_path = f"final_dataset/lose2/{i+index}.png"  # Moderate num_choices
+            lose3_path = f"final_dataset/lose3/{i+index}.png"  # Highest num_choices
 
-        # Save images to corresponding paths
-        image1.save(win_path)  # Winner image
-        image_choices[0][0].save(lose1_path)  # Image with least num_choices
-        image_choices[1][0].save(lose2_path)  # Image with moderate num_choices
-        image_choices[2][0].save(lose3_path)  # Image with highest num_choices
+            # Save images to corresponding paths
+            image1.save(win_path)  # Winner image
+            image_choices[0][0].save(lose1_path)  # Image with least num_choices
+            image_choices[1][0].save(lose2_path)  # Image with moderate num_choices
+            image_choices[2][0].save(lose3_path)  # Image with highest num_choices
 
-            # Append data to CSV
-        pd.DataFrame([[full_text, win_path, lose1_path, lose2_path, lose3_path]], columns=columns)\
-              .to_csv(output_csv, mode='a', header=False, index=False)
-  # return prompt_list1,image1_list, image2_list,image3_list,image4_list
+                # Append data to CSV
+            pd.DataFrame([[full_text, win_path, lose1_path, lose2_path, lose3_path]], columns=columns)\
+                .to_csv(output_csv, mode='a', header=False, index=False)
+    # return prompt_list1,image1_list, image2_list,image3_list,image4_list
 
 def data_generation2(type,prompt_list,external_df=None,index=0):
 
@@ -302,18 +303,14 @@ def data_generation2(type,prompt_list,external_df=None,index=0):
 
     if(type==2):
       input_image=None
-      image1= Image.open(f'images/images/img{i}.jpg')
-      image1.save('temp.png',"PNG")
-      image1=Image.open('temp.png')
+      image1= Image.open(f'images/images/img{i}.jpg').convert("RGB")
       image1 = image1.resize((512, 512))
       # image1=np.array(image1)
     elif type==3:
       ind=random.choice(range(len(external_df)))
       input_image=external_df['image'][ind]['path']
       # full_text=f'''An image with text "{text}" on background as {external_df['prompt'][ind]}'''
-      image1= Image.open(f'images/images/img{i}.jpg')
-      image1.save('temp.png',"PNG")
-      image1=Image.open('temp.png')
+      image1= Image.open(f'images/images/img{i}.jpg').convert("RGB")
       image1 = image1.resize((512, 512))
       # image1=np.array(image1)
 
@@ -390,4 +387,3 @@ df_hard = final_df[["prompt", "win", "lose1"]]
 df_easy.to_csv('df_easy.csv', index=False)
 df_medium.to_csv('df_medium.csv', index=False)
 df_hard.to_csv('df_hard.csv', index=False)
-
