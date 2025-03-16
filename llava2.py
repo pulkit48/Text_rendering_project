@@ -8,7 +8,8 @@ from datasets import load_dataset
 import re
 import os
 import zipfile
-from concurrent.futures import ProcessPoolExecutor
+import time
+from concurrent.futures import ProcessPoolExecutor,ThreadPoolExecutor
 
 # import torch
 # from transformers import AutoProcessor, LlavaForConditionalGeneration
@@ -180,11 +181,12 @@ def paste_multiline_text(text, margin=20,input_image=None):
     
     image, _, text_color = create_plain_image()
     if input_image is not None:
-      # image = input_image
-      image=Image.open(input_image).convert("RGB")
-      image = image.resize((512, 512))
-      image=np.array(image)
-
+      
+        # start=time.time()
+        image = cv2.imread(input_image)
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)  # Convert BGR to RGB
+        image = cv2.resize(image, (512, 512), interpolation=cv2.INTER_NEAREST)
+        # print(time.time()-start)
     img_h, img_w = image.shape[:2]
     pixels = np.array(image)
     mean_color = tuple(np.mean(pixels, axis=(0, 1)).astype(int))
@@ -239,7 +241,8 @@ def data_generation1(type,prompt_list,external_df=None,index=0):
   with ProcessPoolExecutor(max_workers=os.cpu_count()) as executor:
 
     for i in range(num_samples):
-        print(i)
+        if i%100==0:
+            print(i)
         text = random.choice(prompt_list)
         full_text=f'''An image with white background with text "{text}".'''
         if(type==0):
@@ -249,7 +252,9 @@ def data_generation1(type,prompt_list,external_df=None,index=0):
             ind=random.choice(range(len(external_df)))
 
             input_image=external_df['image'][ind]['path']
+            # start=time.time()
             image1= paste_multiline_text(text, margin=20,input_image=input_image)
+            # print(time.time()-start)
             full_text=f'''An image with text "{text}" on background as {external_df['prompt'][ind]}'''
 
 
@@ -274,16 +279,22 @@ def data_generation1(type,prompt_list,external_df=None,index=0):
             lose2_path = f"final_dataset/lose2/{i+index}.png"  # Moderate num_choices
             lose3_path = f"final_dataset/lose3/{i+index}.png"  # Highest num_choices
 
-            # Save images to corresponding paths
-            image1.save(win_path)  # Winner image
-            image_choices[0][0].save(lose1_path)  # Image with least num_choices
-            image_choices[1][0].save(lose2_path)  # Image with moderate num_choices
-            image_choices[2][0].save(lose3_path)  # Image with highest num_choices
+            start=time.time()
+              
+            def save_image(img, path):
+                # img.save(path)
+                cv2.imwrite(path, cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR))
 
-                # Append data to CSV
-            pd.DataFrame([[full_text, win_path, lose1_path, lose2_path, lose3_path]], columns=columns)\
-                .to_csv(output_csv, mode='a', header=False, index=False)
-    # return prompt_list1,image1_list, image2_list,image3_list,image4_list
+            with ThreadPoolExecutor(max_workers=4) as executor:
+                executor.submit(save_image, image1, win_path)
+                executor.submit(save_image, image_choices[0][0], lose1_path)
+                executor.submit(save_image, image_choices[1][0], lose2_path)
+                executor.submit(save_image, image_choices[2][0], lose3_path)
+            # print(time.time()-start)
+
+            if i%50==0:
+                pd.DataFrame([[full_text, win_path, lose1_path, lose2_path, lose3_path]], columns=columns)\
+                    .to_csv(output_csv, mode='a', header=False, index=False)
 
 def data_generation2(type,prompt_list,external_df=None,index=0):
 
@@ -294,7 +305,8 @@ def data_generation2(type,prompt_list,external_df=None,index=0):
 
 
   for i in range(num_samples):
-    print(i)
+    if i%100==0:
+        print(i)
     full_text=prompt_list[i]
     match = re.search(r"'(.*?)'", full_text)
     if match is None:
@@ -349,41 +361,58 @@ def data_generation2(type,prompt_list,external_df=None,index=0):
       print("Problem")
 
 
+def load_dataset_parallel():
+    dataset = load_dataset(
+        'poloclub/diffusiondb', 
+        'large_random_1k',          # Changed to 'large_random_20k'
+        num_proc=os.cpu_count(),  # Use all available CPU cores
+        cache_dir="./dataset_cache",  # Cache the dataset locally
+        # split='train'
+    )
+    
+    # Convert to pandas more efficiently
+    external_df = dataset['train'].to_pandas()
+    # external_df.to_csv('external_df.csv',index=False)
+    return external_df
 
 ######## Also this code you can just replace
 
-dataset = load_dataset('poloclub/diffusiondb', 'large_random_1k')
-external_df=dataset['train'].to_pandas()
+if __name__ == '__main__':
+    print(time.time())
+    # dataset = load_dataset('poloclub/diffusiondb', 'large_random_100k')
+    # external_df=dataset['train'].to_pandas()
+    external_df=load_dataset_parallel()
+    print(time.time())
+    output_csv = 'final_dataset.csv'
+    columns = ["prompt", "win", "lose1", "lose2", "lose3"]
+    pd.DataFrame(columns=columns).to_csv(output_csv, index=False)
 
-output_csv = 'final_dataset.csv'
-columns = ["prompt", "win", "lose1", "lose2", "lose3"]
-pd.DataFrame(columns=columns).to_csv(output_csv, index=False)
+    prompt_list=[]
+    with open(r'/mnt/home-ldap/bansal_ldap/pulkit/data_100k.txt') as f:
+        lines = f.readlines()
+        for line in lines:
+            prompt_list.append(line.strip())
 
-prompt_list=[]
-with open(r'/mnt/home-ldap/bansal_ldap/pulkit/data_100k.txt') as f:
-    lines = f.readlines()
-    for line in lines:
-        prompt_list.append(line.strip())
+    data_generation1(type=0,prompt_list=prompt_list,external_df=None,index=0)
+    data_generation1(type=1,prompt_list=prompt_list,external_df=external_df,index=num_samples)
 
-data_generation1(type=0,prompt_list=prompt_list,external_df=None,index=0)
-data_generation1(type=1,prompt_list=prompt_list,external_df=external_df,index=1000)
+    print(time.time())
 
 
+# prompt_list=[]
+# with open('eval_prompt2.txt') as f:
+#     lines = f.readlines()
+#     for line in lines:
+#         prompt_list.append(line.strip())
 
-prompt_list=[]
-with open('eval_prompt2.txt') as f:
-    lines = f.readlines()
-    for line in lines:
-        prompt_list.append(line.strip())
+# data_generation2(type=2,prompt_list=prompt_list,external_df=None,index=2000)
+# data_generation2(type=3,prompt_list=prompt_list,external_df=external_df,index=3000)
 
-data_generation2(type=2,prompt_list=prompt_list,external_df=None,index=2000)
-data_generation2(type=3,prompt_list=prompt_list,external_df=external_df,index=3000)
+    final_df = pd.read_csv(output_csv)  # Removed 'index=False' from read_csv
+    df_easy = final_df[["prompt", "win", "lose3"]]
+    df_medium = final_df[["prompt", "win", "lose2"]]
+    df_hard = final_df[["prompt", "win", "lose1"]]
 
-final_df = pd.read_csv(output_csv)  # Removed 'index=False' from read_csv
-df_easy = final_df[["prompt", "win", "lose3"]]
-df_medium = final_df[["prompt", "win", "lose2"]]
-df_hard = final_df[["prompt", "win", "lose1"]]
-
-df_easy.to_csv('df_easy.csv', index=False)
-df_medium.to_csv('df_medium.csv', index=False)
-df_hard.to_csv('df_hard.csv', index=False)
+    df_easy.to_csv('df_easy.csv', index=False)
+    df_medium.to_csv('df_medium.csv', index=False)
+    df_hard.to_csv('df_hard.csv', index=False)
