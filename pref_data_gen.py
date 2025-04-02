@@ -17,7 +17,6 @@ def apply_gaussian_blur(image_np): # Renamed back from 'heavy'
     """Applies Gaussian Blur with a moderate kernel size."""
     # Reduced kernel size range
     ksize = random.randrange(3, 15, 2) # Random odd kernel size between 3 and 13
-    print(f"Applying Gaussian Blur with kernel size: {ksize}")
     blurred_image = cv2.GaussianBlur(image_np, (ksize, ksize), 0)
     return blurred_image
 
@@ -29,7 +28,6 @@ def apply_rotation(image_np):
     M = cv2.getRotationMatrix2D(center, angle, 1.0)
     # Changed borderMode back to replicate to avoid black corners
     rotated_image = cv2.warpAffine(image_np, M, (w, h), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE)
-    print(f"Applying full rotation with angle: {angle:.2f} degrees (replicate borders)")
     return rotated_image
 
 def apply_partial_rotation(image_np):
@@ -45,7 +43,6 @@ def apply_partial_rotation(image_np):
     angle = random.uniform(-90, 90) # Reduced angle range for partial
     (roi_h_actual, roi_w_actual) = roi.shape[:2]
     if roi_h_actual == 0 or roi_w_actual == 0:
-        print("Skipping partial rotation due to zero-sized ROI")
         return image_np
     roi_center = (roi_w_actual // 2, roi_h_actual // 2)
     M = cv2.getRotationMatrix2D(roi_center, angle, 1.0)
@@ -56,7 +53,6 @@ def apply_partial_rotation(image_np):
     rotated_roi = cv2.warpAffine(roi, M, (roi_w_actual, roi_h_actual), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT, borderValue=fill_color)
     output_image = image_np.copy()
     output_image[roi_y:roi_y + roi_h, roi_x:roi_x + roi_w] = rotated_roi
-    print(f"Applying partial rotation: Angle={angle:.2f}, ROI=({roi_x},{roi_y}, {roi_w}, {roi_h})")
     return output_image
 
 
@@ -70,7 +66,6 @@ def add_gaussian_noise(image_np): # Renamed back from 'heavy'
     else:
         noise = np.random.normal(mean, std_dev, (h, w))
     noisy_image = np.clip(image_np.astype(np.float32) + noise, 0, 255).astype(np.uint8)
-    print(f"Adding Gaussian Noise with std dev: {std_dev:.2f}")
     return noisy_image
 
 def apply_shear(image_np):
@@ -81,7 +76,6 @@ def apply_shear(image_np):
     M = np.array([[1, shear_factor_x, 0], [shear_factor_y, 1, 0]], dtype=np.float32)
     # Use replicate border instead of black fill
     sheared_image = cv2.warpAffine(image_np, M, (w, h), borderMode=cv2.BORDER_REPLICATE)
-    print(f"Applying Shear with factors: x={shear_factor_x:.2f}, y={shear_factor_y:.2f}")
     return sheared_image
 
 def add_salt_pepper_noise(image_np):
@@ -103,7 +97,6 @@ def add_salt_pepper_noise(image_np):
         noisy_image[coords_salt[0], coords_salt[1]] = 255
         noisy_image[coords_pepper[0], coords_pepper[1]] = 0
 
-    print(f"Adding Salt & Pepper noise with amount: {amount*100:.2f}%")
     return noisy_image
 
 def add_random_occlusion(image_np):
@@ -111,7 +104,6 @@ def add_random_occlusion(image_np):
     output_image = image_np.copy()
     (h, w) = image_np.shape[:2]
     num_occlusions = random.randint(1, 3) # Reduced number of occlusions
-    print(f"Adding {num_occlusions} random occlusions.")
 
     for _ in range(num_occlusions):
         color_val = random.randint(0, 255)
@@ -152,7 +144,6 @@ def apply_pixelation(image_np): # Renamed back from 'heavy'
 
     temp_img = cv2.resize(image_np, (max(1, w // pixel_size), max(1, h // pixel_size)), interpolation=cv2.INTER_NEAREST)
     pixelated_image = cv2.resize(temp_img, (w, h), interpolation=cv2.INTER_NEAREST)
-    print(f"Applying Pixelation with block size approx {pixel_size}x{pixel_size}")
     return pixelated_image
 
 def apply_elastic_transform(image_np): # Renamed back from 'strong'
@@ -174,7 +165,6 @@ def apply_elastic_transform(image_np): # Renamed back from 'strong'
     map_x = x + dx
     map_y = y + dy
     distorted_image = cv2.remap(image_np, map_x, map_y, interpolation=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REFLECT_101)
-    print(f"Applying Elastic Transform with alpha={alpha:.1f}, sigma={sigma:.1f}")
     return distorted_image
 
 def apply_cutout(image_np):
@@ -189,7 +179,6 @@ def apply_cutout(image_np):
     cutout_h = min(cutout_h, h - 1)
     cutout_w = min(cutout_w, w - 1)
     if cutout_h <=0 or cutout_w <=0:
-        print("Skipping cutout due to small image size.")
         return image_np
 
     cutout_y = random.randint(0, max(0, h - cutout_h - 1))
@@ -199,7 +188,6 @@ def apply_cutout(image_np):
     if len(image_np.shape) < 3: color = 0
 
     cv2.rectangle(output_image, (cutout_x, cutout_y), (cutout_x + cutout_w, cutout_y + cutout_h), color, -1)
-    print(f"Applying Cutout at ({cutout_x},{cutout_y}) size {cutout_w}x{cutout_h}")
     return output_image
 
 def apply_posterize(image_np):
@@ -207,7 +195,6 @@ def apply_posterize(image_np):
     image_pil = Image.fromarray(cv2.cvtColor(image_np, cv2.COLOR_BGR2RGB))
     bits = random.randint(3, 6) # Reduced to 8-64 colors per channel (more bits = less effect)
     posterized_pil = ImageOps.posterize(image_pil, bits)
-    print(f"Applying Posterization with {bits} bits per channel")
     output_image_np = cv2.cvtColor(np.array(posterized_pil), cv2.COLOR_RGB2BGR)
     return output_image_np
 
@@ -225,13 +212,13 @@ def simulate_jpeg_compression(image_np):
          print("Error: Failed to decode image after JPEG simulation.")
          return image_np
 
-    print(f"Simulating JPEG Compression with quality={quality}")
+    
     return decoded_img
 
 def apply_channel_swap(image_np):
     """Randomly swaps channels (less likely to drop)."""
     if len(image_np.shape) < 3:
-        print("Skipping channel swap for grayscale image.")
+        
         return image_np
 
     output_image = image_np.copy()
@@ -242,23 +229,18 @@ def apply_channel_swap(image_np):
     if action == 'swap':
         random.shuffle(channels)
         output_image = cv2.merge(channels)
-        print("Applying Channel Swap (Random Order)")
     elif action == 'drop':
         channel_to_drop = random.randint(0, 2)
         zero_channel = np.zeros_like(channels[0])
         channels[channel_to_drop] = zero_channel
-        # Less likely to drop a second channel
-        # if random.random() < 0.1:
-        #      remaining_channels = [i for i in range(3) if i != channel_to_drop]
-        #      if remaining_channels: channels[random.choice(remaining_channels)] = zero_channel
+        
         output_image = cv2.merge(channels)
-        print(f"Applying Channel Drop (Dropped channel {channel_to_drop})")
+        
     elif action == 'swap_bw':
          ch_idx = random.sample(range(3), 3)
          gray_equiv = cv2.cvtColor(image_np, cv2.COLOR_BGR2GRAY)
          output_image = cv2.merge((channels[ch_idx[0]], channels[ch_idx[1]], gray_equiv))
-         print("Applying Channel Swap (mixed with grayscale)")
-
+        
     return output_image
 
 def apply_distortion(selected_distortion_functions, distorted_image):
@@ -273,22 +255,13 @@ def apply_distortion(selected_distortion_functions, distorted_image):
                 
     
     return distorted_image
-    
-def url_to_cv2_image(url):
-    """Fetch an image from a URL and convert it to an OpenCV image."""
-    print(url)
-    response = requests.get(url, stream=True)
-    response.raise_for_status()  # Ensure we got a valid response
-    image_array = np.asarray(bytearray(response.content), dtype=np.uint8)
-    return cv2.imdecode(image_array, cv2.IMREAD_COLOR)    
-
 
 def dataset_preprocessing():
-    if not os.path.exists("images"):
-        os.mkdir("images")
+    if not os.path.exists("HPDv2_images"):
+        os.mkdir("HPDv2_images")
     dataset = load_dataset("ymhao/HPDv2", split='train')
     print(len(dataset))
-    dataset=dataset[:10]
+    dataset=dataset[:1000]
     # Convert the dictionary to a Pandas DataFrame (Faster!)
     df = pd.DataFrame.from_dict(dataset)
 
@@ -322,8 +295,8 @@ def dataset_preprocessing():
                 img1 = img3
 
         # temp[prompt] = [img1, img2]  # Store final result
-        path1=f"images/img_{ind}_lose.png"
-        path2=f"images/img_{ind}_win.png"
+        path1=f"HPDv2_images/img_{ind}_lose.png"
+        path2=f"HPDv2_images/img_{ind}_win.png"
         img1.save(path1)
         img2.save(path2)
         temp[prompt] = [path1, path2] 
@@ -336,7 +309,7 @@ def dataset_preprocessing():
     df_temp.reset_index(inplace=True)
     df_temp.rename(columns={'index': 'prompt'}, inplace=True)
     print("Yes")
-    df_temp.to_csv('final_data.csv', index=False)
+    df_temp.to_csv('HPDv2_final_data.csv', index=False)
     print(df_temp.head())  # Check the first few rows
 
 
@@ -344,8 +317,8 @@ def dataset_preprocessing():
 
 if __name__ == "__main__":
     # --- Configuration ---
-    if os.path.exists("dataset"):
-        shutil.rmtree("dataset")
+    if not os.path.exists("dataset"):
+        
         os.mkdir("dataset")
         os.mkdir("dataset/win")
         os.mkdir("dataset/lose1")
@@ -354,9 +327,9 @@ if __name__ == "__main__":
     
         
     outut_dir="dataset"
-    
-    dataset_preprocessing()
-    df=pd.read_csv("final_data.csv")
+    if not os.path.exists("HPDv2_final_data.csv"):
+        dataset_preprocessing()
+    df=pd.read_csv("HPDv2_final_data.csv")
     # List of available distortion functions (with reduced intensity parameters)
     available_distortions = [
         apply_gaussian_blur,
@@ -403,10 +376,10 @@ if __name__ == "__main__":
             selected_distortion_functions2 = random.choices(available_distortions, k=num_distortions_to_apply)
             lose_image2=apply_distortion(selected_distortion_functions2, working_image)
             
-            win_image_path=os.path.join(outut_dir,"win_"+str(i)+".png")
-            lose_image1_path=os.path.join(outut_dir,"lose1_"+str(i)+".png")
-            lose_image2_path=os.path.join(outut_dir,"lose2_"+str(i)+".png")
-            lose_image3_path=os.path.join(outut_dir,"lose3_"+str(i)+".png")
+            win_image_path=os.path.join(outut_dir,"win",str(i)+".png")
+            lose_image1_path=os.path.join(outut_dir,"lose1",str(i)+".png")
+            lose_image2_path=os.path.join(outut_dir,"lose2",str(i)+".png")
+            lose_image3_path=os.path.join(outut_dir,"lose3",str(i)+".png")
             
 
             if win_image is None or lose_image1 is None or lose_image2 is None or lose_image3 is None:
