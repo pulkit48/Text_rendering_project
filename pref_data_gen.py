@@ -9,6 +9,7 @@ import io
 import shutil
 import requests
 from datasets import load_dataset,concatenate_datasets
+from tqdm import tqdm
 
 # --- Distortion Function Definitions (Reduced Intensity) ---
 
@@ -280,7 +281,65 @@ def url_to_cv2_image(url):
     response.raise_for_status()  # Ensure we got a valid response
     image_array = np.asarray(bytearray(response.content), dtype=np.uint8)
     return cv2.imdecode(image_array, cv2.IMREAD_COLOR)    
-                
+
+
+def dataset_preprocessing():
+    if os.path.exists("images"):
+        os.mkdir("images")
+    dataset = load_dataset("ymhao/HPDv2", split='train')
+    print(len(dataset))
+    dataset=dataset[:]
+    # Convert the dictionary to a Pandas DataFrame (Faster!)
+    df = pd.DataFrame.from_dict(dataset)
+
+    df=df[['prompt','image','human_preference']]
+
+    df.loc[df["human_preference"].apply(lambda x: x[0] == 1), "image"] = (
+        df.loc[df["human_preference"].apply(lambda x: x[0] == 1), "image"]
+        .apply(lambda x: [x[1], x[0]])  # Swap the images
+    )
+
+
+    # Dictionary to store final image pairs
+    temp = {}
+
+    # Convert 'image' column to tuples for hashability (since lists are mutable)
+    df['image_tuple'] = df['image'].apply(lambda x: tuple(x))
+
+    # Use Pandas `groupby` to process prompts efficiently
+    grouped = df.groupby('prompt')['image_tuple'].apply(list)
+
+    ind=0
+    # Process each unique prompt efficiently
+    for prompt, images in tqdm(grouped.items()):
+        
+        img1, img2 = images[0]  # Initialize first image pair
+
+        for img3, img4 in images[1:]:  # Process remaining images
+            if img2 == img3:
+                img2 = img4
+            elif img1 == img4:
+                img1 = img3
+
+        # temp[prompt] = [img1, img2]  # Store final result
+        path1=f"images/img_{ind}_lose.png"
+        path2=f"images/img_{ind}_win.png"
+        img1.save(path1)
+        img2.save(path2)
+        temp[prompt] = [path1, path2] 
+        ind+=1
+
+    # Convert dictionary to DataFrame
+    df_temp = pd.DataFrame.from_dict(temp, orient='index', columns=['image1', 'image2'])
+
+    # Reset index to make 'prompt' a column
+    df_temp.reset_index(inplace=True)
+    df_temp.rename(columns={'index': 'prompt'}, inplace=True)
+    print("Yes")
+    df_temp.to_csv('final_data.csv', index=False)
+    print(df_temp.head())  # Check the first few rows
+
+
 # --- Main Execution Logic ---
 
 if __name__ == "__main__":
@@ -295,21 +354,8 @@ if __name__ == "__main__":
     
         
     outut_dir="dataset"
-    # df= pd.read_csv(r"C:\Users\F-PulkitB\Downloads\Text_Rendering\pickapic_v2_no_images.csv")
-    df=load_dataset("yuvalkirstain/pickapic_v2",num_proc=4)
-    merged_dataset = concatenate_datasets([
-    df["train"],
-    df["validation"],
-    df["test"]
-    ])
-    df=merged_dataset.to_pandas()[['caption','jpg_0','jpg_1',"label_0","label_1"]]
-    df=df[df['label_0']!=df['label_1']]
-    print(len(df))
-    swap_mask = (df['label_0'] == 1) & (df['label_1'] == 0)
-
-    df.loc[swap_mask, ['jpg_0', 'jpg_1']] = df.loc[swap_mask, ['jpg_1', 'jpg_0']].values
-    df.to_csv("pickapic_v2_no_images.csv",index=False)
     
+    dataset_preprocessing()
     # List of available distortion functions (with reduced intensity parameters)
     available_distortions = [
         apply_gaussian_blur,
