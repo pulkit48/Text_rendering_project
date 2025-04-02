@@ -284,11 +284,11 @@ def url_to_cv2_image(url):
 
 
 def dataset_preprocessing():
-    if os.path.exists("images"):
+    if not os.path.exists("images"):
         os.mkdir("images")
     dataset = load_dataset("ymhao/HPDv2", split='train')
     print(len(dataset))
-    dataset=dataset[:]
+    dataset=dataset[:10]
     # Convert the dictionary to a Pandas DataFrame (Faster!)
     df = pd.DataFrame.from_dict(dataset)
 
@@ -356,6 +356,7 @@ if __name__ == "__main__":
     outut_dir="dataset"
     
     dataset_preprocessing()
+    df=pd.read_csv("final_data.csv")
     # List of available distortion functions (with reduced intensity parameters)
     available_distortions = [
         apply_gaussian_blur,
@@ -377,19 +378,13 @@ if __name__ == "__main__":
 
     for i in range(len(df)):
         print(i)
-        prompt = df['caption'][i]
+        prompt = df['prompt'][i]
         try:
-            # win_image = url_to_cv2_image(df['image_0_url'][i])
-            # lose_image = url_to_cv2_image(df['image_1_url'][i])
+            
+            win_image=cv2.imread(df['image2'][i])
+            lose_image3=cv2.imread(df['image1'][i])
 
-            # # Convert from BGR (OpenCV default) to RGB if needed
-            # win_image = cv2.cvtColor(win_image, cv2.COLOR_BGR2RGB)
-            # lose_image = cv2.cvtColor(lose_image, cv2.COLOR_BGR2RGB)
-
-            win_image=cv2.imread(df['jpg_0'][i])
-            lose_image1=cv2.imread(df['jpg_1'][i])
-
-            working_image=lose_image1
+            working_image=lose_image3
 
             # --- Apply Random Distortions (Reduced Number) ---
             max_distortions_available = len(available_distortions)
@@ -410,8 +405,6 @@ if __name__ == "__main__":
             
             win_image_path=os.path.join(outut_dir,"win_"+str(i)+".png")
             lose_image1_path=os.path.join(outut_dir,"lose1_"+str(i)+".png")
-
-            
             lose_image2_path=os.path.join(outut_dir,"lose2_"+str(i)+".png")
             lose_image3_path=os.path.join(outut_dir,"lose3_"+str(i)+".png")
             
@@ -432,16 +425,24 @@ if __name__ == "__main__":
                 lose_image3 = np.clip(lose_image3, 0, 255).astype(np.uint8)
 
             cv2.imwrite(win_image_path, win_image)
-            cv2.imwrite(lose_image1_path, lose_image1)
+            cv2.imwrite(lose_image3_path, lose_image3)
 
-            if selected_distortion_functions1<selected_distortion_functions2:
+            if len(selected_distortion_functions1)<len(selected_distortion_functions2):
                 cv2.imwrite(lose_image1_path, lose_image1)
                 cv2.imwrite(lose_image2_path, lose_image2)
             else:
                 cv2.imwrite(lose_image2_path, lose_image2)
                 cv2.imwrite(lose_image1_path, lose_image1)
 
-            final_dataset=final_dataset.append({'prompt':prompt,'win_image':win_image_path,'lose_image1':lose_image1_path,'lose_image2':lose_image2_path,'lose_image3':lose_image3_path},ignore_index=True)
+            new_row = pd.DataFrame([{
+                'prompt': prompt,
+                'win_image': win_image_path,
+                'lose_image1': lose_image1_path,
+                'lose_image2': lose_image2_path,
+                'lose_image3': lose_image3_path
+            }])
+
+            final_dataset = pd.concat([final_dataset, new_row], ignore_index=True)
         except Exception as e:
             print(e)
             print("Error-------")
@@ -449,9 +450,9 @@ if __name__ == "__main__":
 
     
     final_dataset.to_csv("final_dataset.csv",index=False)
-    df_easy=final_dataset[final_dataset['prompt','win_image','lose_image1']]
-    df_medium=final_dataset[final_dataset['prompt','win_image','lose_image2']]
-    df_hard=final_dataset[final_dataset['prompt','win_image','lose_image3']]
+    df_easy=final_dataset[['prompt','win_image','lose_image1']]
+    df_medium=final_dataset[['prompt','win_image','lose_image2']]
+    df_hard=final_dataset[['prompt','win_image','lose_image3']]
 
     df_easy.to_csv("df_easy.csv",index=False)
     df_medium.to_csv("df_medium.csv",index=False)
