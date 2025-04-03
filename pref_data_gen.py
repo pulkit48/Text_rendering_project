@@ -218,29 +218,33 @@ def simulate_jpeg_compression(image_np):
 def apply_channel_swap(image_np):
     """Randomly swaps channels (less likely to drop)."""
     if len(image_np.shape) < 3:
-        
+        # Image is already grayscale or has no channels to swap
         return image_np
 
     output_image = image_np.copy()
-    channels = cv2.split(output_image)
+    # Convert the tuple returned by split into a mutable list
+    channels = list(cv2.split(output_image))
+
     # Make swapping more likely than dropping
     action = random.choices(['swap', 'drop', 'swap_bw'], weights=[0.7, 0.15, 0.15], k=1)[0]
 
     if action == 'swap':
+        # Now shuffle works because channels is a list
         random.shuffle(channels)
-        output_image = cv2.merge(channels)
+        output_image = cv2.merge(channels) # cv2.merge can take a list or tuple
     elif action == 'drop':
         channel_to_drop = random.randint(0, 2)
         zero_channel = np.zeros_like(channels[0])
+        # Now item assignment works because channels is a list
         channels[channel_to_drop] = zero_channel
-        
         output_image = cv2.merge(channels)
-        
     elif action == 'swap_bw':
+         # No modification needed here, just accessing elements
          ch_idx = random.sample(range(3), 3)
          gray_equiv = cv2.cvtColor(image_np, cv2.COLOR_BGR2GRAY)
+         # Merging selected channels (original or grayscale)
          output_image = cv2.merge((channels[ch_idx[0]], channels[ch_idx[1]], gray_equiv))
-        
+
     return output_image
 
 def apply_distortion(selected_distortion_functions, distorted_image):
@@ -248,10 +252,13 @@ def apply_distortion(selected_distortion_functions, distorted_image):
     for i, distortion_func in enumerate(selected_distortion_functions):
             
             try:
+                # print(type(distorted_image))
+                # print(distortion_func)
                 distorted_image = distortion_func(distorted_image)
                 
             except Exception as e:
-                return None
+                print(e)
+                # return None
                 
     
     return distorted_image
@@ -261,11 +268,12 @@ def dataset_preprocessing():
         os.mkdir("HPDv2_images")
     dataset = load_dataset("ymhao/HPDv2", split='train')
     print(len(dataset))
-    dataset=dataset[:1000]
+    dataset = dataset.select(range(1000))
     # Convert the dictionary to a Pandas DataFrame (Faster!)
-    df = pd.DataFrame.from_dict(dataset)
+    df= dataset.to_pandas()
 
     df=df[['prompt','image','human_preference']]
+    # print(df.head())
 
     df.loc[df["human_preference"].apply(lambda x: x[0] == 1), "image"] = (
         df.loc[df["human_preference"].apply(lambda x: x[0] == 1), "image"]
@@ -297,8 +305,20 @@ def dataset_preprocessing():
         # temp[prompt] = [img1, img2]  # Store final result
         path1=f"HPDv2_images/img_{ind}_lose.png"
         path2=f"HPDv2_images/img_{ind}_win.png"
-        img1.save(path1)
-        img2.save(path2)
+        # print(img1)
+        try:
+            img1['bytes'].save(path1)
+            img2['bytes'].save(path2)
+        except AttributeError:
+            # If 'bytes' contains raw bytes data
+            from PIL import Image
+            import io
+            
+            img1_pil = Image.open(io.BytesIO(img1['bytes']))
+            img2_pil = Image.open(io.BytesIO(img2['bytes']))
+            
+            img1_pil.save(path1)
+            img2_pil.save(path2)
         temp[prompt] = [path1, path2] 
         ind+=1
 
@@ -350,7 +370,8 @@ if __name__ == "__main__":
     final_dataset=pd.DataFrame(columns=['prompt','win_image','lose_image1','lose_image2','lose_image3'])
 
     for i in range(len(df)):
-        print(i)
+        if i%100==0:
+            print(i)
         prompt = df['prompt'][i]
         try:
             
