@@ -253,8 +253,10 @@ def apply_distortion(selected_distortion_functions, distorted_image):
             
             try:
                 # print(type(distorted_image))
-                # print(distortion_func)
-                distorted_image = distortion_func(distorted_image)
+                print(distortion_func)
+                temp_distorted_image = distortion_func(distorted_image)
+                if temp_distorted_image is not None:
+                    distorted_image = temp_distorted_image
                 
             except Exception as e:
                 print(e)
@@ -268,7 +270,7 @@ def dataset_preprocessing():
         os.mkdir("HPDv2_images")
     dataset = load_dataset("ymhao/HPDv2", split='train')
     print(len(dataset))
-    dataset = dataset.select(range(1000))
+    dataset = dataset.select(range(len(dataset)))
     # Convert the dictionary to a Pandas DataFrame (Faster!)
     df= dataset.to_pandas()
 
@@ -306,19 +308,28 @@ def dataset_preprocessing():
         path1=f"HPDv2_images/img_{ind}_lose.png"
         path2=f"HPDv2_images/img_{ind}_win.png"
         # print(img1)
+        if os.path.exists(path1) and os.path.exists(path2):
+            temp[prompt] = [path1, path2] 
+            ind+=1
+            continue
         try:
             img1['bytes'].save(path1)
             img2['bytes'].save(path2)
-        except AttributeError:
+        except :
             # If 'bytes' contains raw bytes data
-            from PIL import Image
-            import io
-            
-            img1_pil = Image.open(io.BytesIO(img1['bytes']))
-            img2_pil = Image.open(io.BytesIO(img2['bytes']))
-            
-            img1_pil.save(path1)
-            img2_pil.save(path2)
+            try:
+                # print(ind)
+                from PIL import Image
+                import io
+                
+                img1_pil = Image.open(io.BytesIO(img1['bytes']))
+                img2_pil = Image.open(io.BytesIO(img2['bytes']))
+                
+                img1_pil.save(path1)
+                img2_pil.save(path2)
+            except:
+                print(ind)
+                continue
         temp[prompt] = [path1, path2] 
         ind+=1
 
@@ -370,14 +381,16 @@ if __name__ == "__main__":
     final_dataset=pd.DataFrame(columns=['prompt','win_image','lose_image1','lose_image2','lose_image3'])
 
     for i in range(len(df)):
-        if i%100==0:
-            print(i)
+        # if i%100==0:
+        print(i)
         prompt = df['prompt'][i]
         try:
             
             win_image=cv2.imread(df['image2'][i])
             lose_image3=cv2.imread(df['image1'][i])
-
+            # if win_image is None or lose_image3 is None:
+            #     print('problem')
+            #     break
             working_image=lose_image3
 
             # --- Apply Random Distortions (Reduced Number) ---
