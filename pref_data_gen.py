@@ -381,8 +381,8 @@ if __name__ == "__main__":
     final_dataset=pd.DataFrame(columns=['prompt','win_image','lose_image1','lose_image2','lose_image3'])
 
     for i in range(len(df)):
-        # if i%100==0:
-        print(i)
+        if i%100==0:
+            print(i)
         prompt = df['prompt'][i]
         try:
             
