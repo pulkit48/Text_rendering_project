@@ -1,12 +1,12 @@
-# import ImageReward as RM
+import ImageReward as RM
 import hpsv2
 from PIL import Image
-# model = RM.load("ImageReward-v1.0")
+model = RM.load("ImageReward-v1.0")
 
-# def image_reward(prompt, image_path):
-#     """Computes the image reward for a given image and prompt."""
-#     image = Image.open(image_path)  # Ensure image is RGB
-#     return model.score(prompt, image)
+def image_reward(prompt, image_path):
+    """Computes the image reward for a given image and prompt."""
+    image = Image.open(image_path)  # Ensure image is RGB
+    return model.score(prompt, image)
 
 def hpsv2_score(prompt, image_path):
     """Computes the HPSv2 score for a given image and prompt."""
