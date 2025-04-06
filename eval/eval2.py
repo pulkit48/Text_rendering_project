@@ -7,6 +7,7 @@ import cv2
 import easyocr
 import warnings
 import torch
+import re
 from PIL import Image
 warnings.filterwarnings("ignore")
 
@@ -38,17 +39,23 @@ def main(args):
         prompt=df.iloc[i]['prompt']
         img_path=df.iloc[i]['img_path']
         
-        
-        match = re.search(r'"(.*?)"', text)
+        if dataset_name == "ours" or dataset_name=='creativebench':
+            match = re.search(r"'(.*?)'", prompt)
+        elif dataset_name == "mario":
+            match = re.search(r"'(.*?)'", prompt)
         if match:
             prompt_main_text = match.group(1)
         else:
             prompt_main_text = ""
 
+        # print(prompt_main_text)
+
         img_bgr = cv2.imread(img_path)
         img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
+        
         ocr_text = reader.readtext(img_rgb, detail=0)
-        df['ocr_text'][i] = " ".join(ocr_text)
+        ocr_text=" ".join(ocr_text)
+        df['ocr_text'][i] = ocr_text
 
         
         clip_val=calculate_clip_score(prompt, img_path)
@@ -60,24 +67,23 @@ def main(args):
         hpsv2_val=hpsv2_score(prompt, img_path)
 
         clip_avg+=clip_val
-        clip_avg/=(i+1)
         em_avg+=em
-        em_avg/=(i+1)
         em_ci_avg+=em_ci
-        em_ci_avg/=(i+1)
         ned_avg+=ned
-        ned_avg/=(i+1)
         nlcs_avg+=lcs
-        nlcs_avg/=(i+1)
-        # image_reward_avg+=image_reward_val
-        # image_reward_avg/=(i+1)
         hpsv2_avg+=hpsv2_val
-        hpsv2_avg/=(i+1)
-
-        print(f"Image {i+1}/{len(df)}: CLIP Score: {clip_val}, EM: {em}, EM (CI): {em_ci}, NED: {ned}, NLCS: {lcs}, HPSv2: {hpsv2_val}")
+        
+        # if i%10==0:
+        print(f"Image {i+1}/{len(df)}: CLIP Score: {clip_avg/(i+1)}, EM: {em_avg/(i+1)}, EM (CI): {em_ci_avg/(i+1)}, NED: {ned_avg/(i+1)}, NLCS: {nlcs_avg/(i+1)}, HPSv2: {hpsv2_avg/(i+1)}")
     
     df.to_csv(result_file_path, index=False)
     
+    clip_avg/=len(df)
+    em_avg/=len(df)
+    em_ci_avg/=len(df)
+    ned_avg/=len(df)
+    nlcs_avg/=len(df)
+    hpsv2_avg/=len(df)
     print(f"Average CLIP Score: {clip_avg}")
     print(f"Average Exact Match Accuracy: {em_avg}")
     print(f"Average Exact Match Accuracy (Case Insensitive): {em_ci_avg}")

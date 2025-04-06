@@ -2,13 +2,15 @@ import Levenshtein as lev
 
 def exact_match_accuracy(ground_truths, predictions):
     """Calculates the exact match accuracy."""
-    correct = sum(gt == pred for gt, pred in zip(ground_truths, predictions))
+    correct = 0
+    for i in range(min(len(ground_truths), len(predictions))):
+        if ground_truths[i] == predictions[i]:
+            correct += 1
     return correct / len(ground_truths) if ground_truths else 0
 
 def exact_match_accuracy_case_insensitive(ground_truths, predictions):
     """Calculates exact match accuracy without case sensitivity."""
-    correct = sum(gt.lower() == pred.lower() for gt, pred in zip(ground_truths, predictions))
-    return correct / len(ground_truths) if ground_truths else 0
+    return exact_match_accuracy(ground_truths.lower(), predictions.lower())
 
 def normalized_edit_distance(ground_truths, predictions):
     distance = lev.distance(ground_truths, predictions)
@@ -35,5 +37,5 @@ def normalized_longest_common_subsequence(original, compared):
     lcs_length = longest_common_subsequence_length(original, compared)
 
     # Calculate similarity as a ratio of LCS length to the length of the original string
-    similarity = lcs_length / len(original)
+    similarity = lcs_length / len(original) if len(original) > 0 else 0
     return similarity
