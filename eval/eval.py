@@ -36,7 +36,7 @@ def main(args):
         from diffusers import KolorsPipeline
         pipe = KolorsPipeline.from_pretrained("Kwai-Kolors/Kolors-diffusers", torch_dtype=torch.float16, variant="fp16").to(device)
         
-    elif args.model == "sd3":
+    elif args.model == "sd3.5":
         from diffusers import StableDiffusion3Pipeline
         pipe = StableDiffusion3Pipeline.from_pretrained("stabilityai/stable-diffusion-3.5-large", torch_dtype=torch.bfloat16).to(device)
 
@@ -47,6 +47,9 @@ def main(args):
     elif args.model == "sdxl":
         from diffusers import DiffusionPipeline
         pipe = DiffusionPipeline.from_pretrained("stabilityai/stable-diffusion-xl-base-1.0", torch_dtype=torch.float16).to(device)
+    elif args.model=='sd3':
+        from diffusers import StableDiffusion3Pipeline
+        pipe = StableDiffusion3Pipeline.from_pretrained("stabilityai/stable-diffusion-3-medium-diffusers", torch_dtype=torch.bfloat16).to(device)
 
     
     # Generate images
@@ -64,12 +67,14 @@ def main(args):
             continue
         if args.model == "kolors":
             image = pipe(prompt=prompt, negative_prompt="", height=512, width=512, guidance_scale=5.0, num_inference_steps=50, generator=torch.Generator(pipe.device).manual_seed(66)).images[0]
-        elif args.model == "sd3":
-            image = pipe(prompt, num_inference_steps=28,height=512, width=512, guidance_scale=3.5, generator=torch.Generator("cuda").manual_seed(0)).images[0]
+        elif args.model == "sd3.5":
+            image = pipe(prompt, num_inference_steps=50,height=512, width=512, guidance_scale=3.5, generator=torch.Generator("cuda").manual_seed(0)).images[0]
         elif args.model == "flux":
             image = pipe(prompt, height=512, width=512, guidance_scale=3.5, num_inference_steps=50, max_sequence_length=512, generator=torch.Generator("cuda").manual_seed(0)).images[0]
         elif args.model=='sdxl':
-            image = pipe(prompt, height=512, width=512, guidance_scale=7.5, num_inference_steps=50).images[0]
+            image = pipe(prompt, height=512, width=512, guidance_scale=7.5, num_inference_steps=50, generator=torch.Generator("cuda").manual_seed(0)).images[0]
+        elif args.model=='sd3':
+            image = pipe(prompt, num_inference_steps=50,height=512, width=512, guidance_scale=7, generator=torch.Generator("cuda").manual_seed(0)).images[0]
 
         image.save(img_path)
 
@@ -85,7 +90,7 @@ def main(args):
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model", type=str, default="kolors", choices=["kolors", "sd3", "flux","sdxl"], help="Model to use for image generation")
+    parser.add_argument("--model", type=str, default="kolors", choices=["kolors", "sd3.5", "flux","sdxl","sd3"], help="Model to use for image generation")
     parser.add_argument("--data", type=str, default="ours.txt",choices=["ours.txt", "anytext.txt","creativebench.txt","mario.txt"], help="Path to data file")
     args = parser.parse_args()
     main(args)
