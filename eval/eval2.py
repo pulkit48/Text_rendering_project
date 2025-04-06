@@ -116,7 +116,7 @@ def main(args):
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="Evaluate the model's performance")
-    parser.add_argument("--model", type=str, default="kolors", choices=["kolors", "sd3", "flux","sdxl"], help="Model to use for evaluation")
+    parser.add_argument("--model", type=str, default="kolors", choices=["kolors", "sd3.5", "flux","sdxl","sd3"], help="Model to use for image generation")
     parser.add_argument("--data", type=str, default="ours.txt",choices=["ours.txt", "anytext.txt","creativebench.txt","mario.txt"], help="Path to data file")
     args = parser.parse_args()
     
