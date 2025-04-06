@@ -1,6 +1,6 @@
 from metric.clip import calculate_clip_score
 from metric.str_match import exact_match_accuracy, exact_match_accuracy_case_insensitive,normalized_edit_distance, longest_common_subsequence_length, normalized_longest_common_subsequence
-from metric.human_pref_metric import hpsv2_score
+from metric.human_pref_metric import hpsv2_score,image_reward
 import pandas as pd
 import numpy as np
 import cv2
@@ -63,7 +63,7 @@ def main(args):
         em_ci=exact_match_accuracy_case_insensitive(prompt_main_text, ocr_text)
         ned=normalized_edit_distance(prompt_main_text, ocr_text)
         lcs=normalized_longest_common_subsequence(prompt_main_text, ocr_text)
-        # image_reward_val=image_reward(prompt, img_path)
+        image_reward_val=image_reward(prompt, img_path)
         hpsv2_val=hpsv2_score(prompt, img_path)
 
         clip_avg+=clip_val
@@ -71,10 +71,11 @@ def main(args):
         em_ci_avg+=em_ci
         ned_avg+=ned
         nlcs_avg+=lcs
+        image_reward_avg+=image_reward_val
         hpsv2_avg+=hpsv2_val
         
         # if i%10==0:
-        print(f"Image {i+1}/{len(df)}: CLIP Score: {clip_avg/(i+1)}, EM: {em_avg/(i+1)}, EM (CI): {em_ci_avg/(i+1)}, NED: {ned_avg/(i+1)}, NLCS: {nlcs_avg/(i+1)}, HPSv2: {hpsv2_avg/(i+1)}")
+        print(f"Image {i+1}/{len(df)}: CLIP Score: {clip_avg/(i+1)}, EM: {em_avg/(i+1)}, EM (CI): {em_ci_avg/(i+1)}, NED: {ned_avg/(i+1)}, NLCS: {nlcs_avg/(i+1)}, HPSv2: {hpsv2_avg/(i+1)}, ImageReward: {image_reward_avg/(i+1)}")
     
     df.to_csv(result_file_path, index=False)
     
@@ -84,12 +85,14 @@ def main(args):
     ned_avg/=len(df)
     nlcs_avg/=len(df)
     hpsv2_avg/=len(df)
+    image_reward_avg/=len(df)
+    
     print(f"Average CLIP Score: {clip_avg}")
     print(f"Average Exact Match Accuracy: {em_avg}")
     print(f"Average Exact Match Accuracy (Case Insensitive): {em_ci_avg}")
     print(f"Average Normalized Edit Distance: {ned_avg}")
     print(f"Average Normalized Longest Common Subsequence: {nlcs_avg}")
-    # print(f"Average Image Reward: {image_reward_avg}")
+    print(f"Average Image Reward: {image_reward_avg}")
     print(f"Average HPSv2: {hpsv2_avg}")
 
     score_dict={
@@ -98,7 +101,7 @@ def main(args):
         "Average Exact Match Accuracy (Case Insensitive)": em_ci_avg,
         "Average Normalized Edit Distance": ned_avg,
         "Average Normalized Longest Common Subsequence": nlcs_avg,
-        # "Average Image Reward": image_reward_avg,
+        "Average Image Reward": image_reward_avg,
         "Average HPSv2": hpsv2_avg
     }
 
