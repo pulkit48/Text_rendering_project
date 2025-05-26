@@ -316,8 +316,10 @@ if __name__ == "__main__":
         prompt = df["prompt"][i]
 
         try:
-            win_image = cv2.imread(df["chosen"][i])
-            lose_image = cv2.imread(df["rejected"][i])
+            nparr = np.frombuffer(df["chosen"][i]['bytes'], np.uint8)
+            win_image = cv2.imdecode(nparr, cv2.IMREAD_COLOR) 
+            nparr = np.frombuffer(df["rejected"][i]['bytes'], np.uint8)
+            lose_image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
             if win_image is None or lose_image is None:
                 continue
 
@@ -333,6 +335,12 @@ if __name__ == "__main__":
                     continue
                 if distorted.dtype != np.uint8:
                     distorted = np.clip(distorted, 0, 255).astype(np.uint8)
+                import torchvision.transforms as T
+
+                transform = T.Compose([
+                    T.ToTensor()  # Converts HxWxC in [0, 255] to CxHxW in [0.0, 1.0]
+                ])
+                distorted = transform(distorted).unsqueeze(0)
                 score = clip_metric(distorted, prompt)
                 distorted_images.append((distorted, score))
 
