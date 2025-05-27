@@ -265,6 +265,23 @@ def apply_distortion(selected_distortion_functions, distorted_image):
     
     return distorted_image
 # --- Main Execution Logic ---
+def tensor_to_numpy(tensor_img):
+    """Convert tensor image back to numpy array in OpenCV format"""
+    # tensor_img is expected to be [1, C, H, W] in range [0, 1]
+    if tensor_img.dim() == 4:
+        tensor_img = tensor_img.squeeze(0)  # Remove batch dimension: [C, H, W]
+    
+    # Convert from [C, H, W] to [H, W, C]
+    numpy_img = tensor_img.permute(1, 2, 0).numpy()
+    
+    # Convert from [0, 1] to [0, 255] and to uint8
+    numpy_img = (numpy_img * 255).astype(np.uint8)
+    
+    # Convert from RGB to BGR for OpenCV
+    if numpy_img.shape[2] == 3:
+        numpy_img = cv2.cvtColor(numpy_img, cv2.COLOR_RGB2BGR)
+    
+    return numpy_img
 
 if __name__ == "__main__":
     import os
@@ -326,7 +343,7 @@ if __name__ == "__main__":
             distorted_images = []
 
             # Generate 100 distorted images
-            for _ in range(100):
+            for _ in range(32):
                 base_image = random.choice([win_image, lose_image])
                 num_ops = random.randint(2, len(available_distortions))
                 funcs = random.choices(available_distortions, k=num_ops)
@@ -342,6 +359,7 @@ if __name__ == "__main__":
                 ])
                 distorted = transform(distorted).unsqueeze(0)
                 score = clip_metric(distorted, prompt)
+                distorted=tensor_to_numpy(distorted)  # Convert back to numpy for saving
                 distorted_images.append((distorted, score))
 
             # --- Select 16 best varied distorted images ---
