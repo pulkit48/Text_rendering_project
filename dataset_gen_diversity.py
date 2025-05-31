@@ -10,6 +10,9 @@ import shutil
 import requests
 from datasets import load_dataset,concatenate_datasets
 from tqdm import tqdm
+from multiprocessing import Pool, cpu_count
+from functools import partial
+import multiprocessing as mp
 
 # --- Distortion Function Definitions (Reduced Intensity) ---
 
@@ -131,19 +134,30 @@ def add_random_occlusion(image_np):
 
     return output_image
 
-def apply_pixelation(image_np): # Renamed back from 'heavy'
-    """Applies moderate pixelation effect."""
+def apply_pixelation(image_np):
+    """Applies light pixelation effect with reduced intensity."""
     (h, w) = image_np.shape[:2]
-    # Reduced max pixel size
-    min_pix_size = max(2, min(h, w) // 80) # Small min block size
-    max_pix_size = max(min_pix_size + 3, min(h, w) // 15) # Moderate max block size
-    if min_pix_size >= max_pix_size: max_pix_size = min_pix_size + 2
-
+    
+    # Much smaller pixel blocks for subtle effect
+    min_pix_size = max(2, min(h, w) // 150)  # Increased divisor from 80 to 150
+    max_pix_size = max(min_pix_size + 1, min(h, w) // 50)  # Increased divisor from 15 to 50
+    
+    if min_pix_size >= max_pix_size: 
+        max_pix_size = min_pix_size + 1
+    
     pixel_size = random.randint(min_pix_size, max_pix_size)
-    if pixel_size <= 0: pixel_size = min_pix_size
-
+    if pixel_size <= 0: 
+        pixel_size = 2  # Minimum safe value
+    
+    # Apply pixelation
     temp_img = cv2.resize(image_np, (max(1, w // pixel_size), max(1, h // pixel_size)), interpolation=cv2.INTER_NEAREST)
     pixelated_image = cv2.resize(temp_img, (w, h), interpolation=cv2.INTER_NEAREST)
+    
+    # Optional: Blend with original for even more subtle effect
+    # Uncomment the next two lines if you want to blend with original image
+    # blend_factor = random.uniform(0.3, 0.7)  # 30-70% pixelation
+    # pixelated_image = cv2.addWeighted(image_np, 1-blend_factor, pixelated_image, blend_factor, 0)
+    
     return pixelated_image
 
 def apply_elastic_transform(image_np): # Renamed back from 'strong'
@@ -264,6 +278,7 @@ def apply_distortion(selected_distortion_functions, distorted_image):
                 
     
     return distorted_image
+
 # --- Main Execution Logic ---
 def tensor_to_numpy(tensor_img):
     """Convert tensor image back to numpy array in OpenCV format"""
@@ -283,14 +298,120 @@ def tensor_to_numpy(tensor_img):
     
     return numpy_img
 
-if __name__ == "__main__":
-    import os
-    import cv2
-    import pandas as pd
-    import numpy as np
-    import random
-    from torchmetrics.multimodal.clip_score import CLIPScore
+def max_variation_dp(data, k=16):
+    """Dynamic programming approach to select k most varied items."""
+    from functools import lru_cache
+    data = sorted(data, key=lambda x: x[1])
+    N = len(data)
 
+    @lru_cache(maxsize=None)
+    def dp(pos, rem, last_score):
+        if rem == 0:
+            return 0, []
+        if pos == N:
+            return float("-inf"), []
+
+        take_score = abs(data[pos][1] - last_score) if last_score is not None else 0
+        take_sum, take_list = dp(pos + 1, rem - 1, data[pos][1])
+        take_sum += take_score
+
+        skip_sum, skip_list = dp(pos + 1, rem, last_score)
+
+        if take_sum > skip_sum:
+            return take_sum, [data[pos]] + take_list
+        else:
+            return skip_sum, skip_list
+
+    _, best_subset = dp(0, k, None)
+    return best_subset
+
+def process_single_row(args):
+    """Process a single row of data - this function will be parallelized."""
+    i, row_data, output_dir, available_distortions = args
+    
+    try:
+        # Import required modules inside the function for multiprocessing
+        import torch
+        import torchvision.transforms as T
+        from torchmetrics.multimodal.clip_score import CLIPScore
+        
+        # Initialize CLIP metric for this process
+        clip_metric = CLIPScore(model_name_or_path="openai/clip-vit-base-patch16")
+        
+        prompt = row_data["prompt"]
+        
+        # Decode images
+        nparr = np.frombuffer(row_data["chosen"]['bytes'], np.uint8)
+        win_image = cv2.imdecode(nparr, cv2.IMREAD_COLOR) 
+        nparr = np.frombuffer(row_data["rejected"]['bytes'], np.uint8)
+        lose_image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        
+        if win_image is None or lose_image is None:
+            return None
+
+        distorted_images = []
+
+        # Generate 32 distorted images
+        for _ in range(32):
+            base_image = random.choice([win_image, lose_image])
+            num_ops = random.randint(2, len(available_distortions))
+            funcs = random.choices(available_distortions, k=num_ops)
+            distorted = apply_distortion(funcs, base_image)
+            if distorted is None:
+                continue
+            if distorted.dtype != np.uint8:
+                distorted = np.clip(distorted, 0, 255).astype(np.uint8)
+
+            transform = T.Compose([
+                T.ToTensor()  # Converts HxWxC in [0, 255] to CxHxW in [0.0, 1.0]
+            ])
+            distorted_tensor = transform(distorted).unsqueeze(0)
+            score = clip_metric(distorted_tensor, prompt)
+            distorted_numpy = tensor_to_numpy(distorted_tensor)  # Convert back to numpy for saving
+            distorted_images.append((distorted_numpy, score))
+
+        # Select 16 best varied distorted images
+        best_subset = max_variation_dp(distorted_images, k=16)
+        if len(best_subset) < 16:
+            return None
+
+        # Save win image
+        win_path = os.path.join(output_dir, "win", f"{i}.png")
+        if win_image.dtype != np.uint8:
+            win_image = np.clip(win_image, 0, 255).astype(np.uint8)
+        cv2.imwrite(win_path, win_image)
+
+        # Save lose images
+        lose_paths = []
+        for j, (img, _) in enumerate(best_subset):
+            path = os.path.join(output_dir, f"lose{j+1}", f"{i}.png")
+            cv2.imwrite(path, img)
+            lose_paths.append(path)
+
+        # Create data row
+        data_row = {"prompt": prompt, "win_image": win_path}
+        for k in range(16):
+            data_row[f"lose_image{k+1}"] = lose_paths[k]
+
+        return data_row
+
+    except Exception as e:
+        print(f"Error processing row {i}: {e}")
+        return None
+
+def process_chunk(chunk_args):
+    """Process a chunk of rows sequentially within a single process."""
+    chunk_data, output_dir, available_distortions = chunk_args
+    results = []
+    
+    for args in chunk_data:
+        result = process_single_row((*args, output_dir, available_distortions))
+        if result is not None:
+            results.append(result)
+    
+    return results
+
+if __name__ == "__main__":
     # --- Configuration ---
     output_dir = "dataset"
     if not os.path.exists(output_dir):
@@ -299,15 +420,12 @@ if __name__ == "__main__":
         for n in range(1, 17):  # lose1 to lose16
             os.mkdir(os.path.join(output_dir, f"lose{n}"))
 
-    from datasets import load_dataset
-
     # Load the dataset from Hugging Face
     dataset = load_dataset("data-is-better-together/open-image-preferences-v1-binarized")
     df = pd.DataFrame(dataset['train'])
 
     available_distortions = [
         apply_gaussian_blur,
-        apply_rotation,
         apply_partial_rotation,
         add_gaussian_noise,
         apply_shear,
@@ -321,110 +439,47 @@ if __name__ == "__main__":
         apply_channel_swap,
     ]
 
-    clip_metric = CLIPScore(model_name_or_path="openai/clip-vit-base-patch16")
+    # Prepare data for parallel processing
+    num_processes = max(1, cpu_count() - 1)  # Leave one CPU core free
+    print(f"Using {num_processes} processes for parallel processing")
+    
+    # Create chunks of data to reduce memory overhead
+    chunk_size = max(1, len(df) // (num_processes * 4))  # Create more chunks than processes
+    chunks = []
+    
+    for start_idx in range(0, len(df), chunk_size):
+        end_idx = min(start_idx + chunk_size, len(df))
+        chunk_data = []
+        for i in range(start_idx, end_idx):
+            chunk_data.append((i, df.iloc[i]))
+        chunks.append((chunk_data, output_dir, available_distortions))
+    
+    print(f"Processing {len(df)} rows in {len(chunks)} chunks with {num_processes} processes")
 
-    # Create DataFrame with columns for 16 losing images
-    lose_cols = [f"lose_image{i}" for i in range(1, 17)]
-    final_dataset = pd.DataFrame(columns=["prompt", "win_image"] + lose_cols)
+    # Process chunks in parallel
+    all_results = []
+    with Pool(processes=num_processes) as pool:
+        # Use tqdm for progress tracking
+        chunk_results = list(tqdm(
+            pool.imap(process_chunk, chunks), 
+            total=len(chunks), 
+            desc="Processing chunks"
+        ))
+        
+        # Flatten results
+        for chunk_result in chunk_results:
+            all_results.extend(chunk_result)
 
-    for i in range(len(df)):
-        if i % 100 == 0:
-            print(f"Processing row {i}")
-        prompt = df["prompt"][i]
-
-        try:
-            nparr = np.frombuffer(df["chosen"][i]['bytes'], np.uint8)
-            win_image = cv2.imdecode(nparr, cv2.IMREAD_COLOR) 
-            nparr = np.frombuffer(df["rejected"][i]['bytes'], np.uint8)
-            lose_image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-            if win_image is None or lose_image is None:
-                continue
-
-            distorted_images = []
-
-            # Generate 100 distorted images
-            for _ in range(32):
-                base_image = random.choice([win_image, lose_image])
-                num_ops = random.randint(2, len(available_distortions))
-                funcs = random.choices(available_distortions, k=num_ops)
-                distorted = apply_distortion(funcs, base_image)
-                if distorted is None:
-                    continue
-                if distorted.dtype != np.uint8:
-                    distorted = np.clip(distorted, 0, 255).astype(np.uint8)
-                import torchvision.transforms as T
-
-                transform = T.Compose([
-                    T.ToTensor()  # Converts HxWxC in [0, 255] to CxHxW in [0.0, 1.0]
-                ])
-                distorted = transform(distorted).unsqueeze(0)
-                score = clip_metric(distorted, prompt)
-                distorted=tensor_to_numpy(distorted)  # Convert back to numpy for saving
-                distorted_images.append((distorted, score))
-
-            # --- Select 16 best varied distorted images ---
-            def max_variation_dp(data, k=16):
-                from functools import lru_cache
-                data = sorted(data, key=lambda x: x[1])
-                N = len(data)
-
-                @lru_cache(maxsize=None)
-                def dp(pos, rem, last_score):
-                    if rem == 0:
-                        return 0, []
-                    if pos == N:
-                        return float("-inf"), []
-
-                    take_score = abs(data[pos][1] - last_score) if last_score is not None else 0
-                    take_sum, take_list = dp(pos + 1, rem - 1, data[pos][1])
-                    take_sum += take_score
-
-                    skip_sum, skip_list = dp(pos + 1, rem, last_score)
-
-                    if take_sum > skip_sum:
-                        return take_sum, [data[pos]] + take_list
-                    else:
-                        return skip_sum, skip_list
-
-                _, best_subset = dp(0, k, None)
-                return best_subset
-
-            best_subset = max_variation_dp(distorted_images, k=16)
-            if len(best_subset) < 16:
-                continue
-
-            # Save win image
-            win_path = os.path.join(output_dir, "win", f"{i}.png")
-            if win_image.dtype != np.uint8:
-                win_image = np.clip(win_image, 0, 255).astype(np.uint8)
-            cv2.imwrite(win_path, win_image)
-
-            lose_paths = []
-            for j, (img, _) in enumerate(best_subset):
-                path = os.path.join(output_dir, f"lose{j+1}", f"{i}.png")
-                cv2.imwrite(path, img)
-                lose_paths.append(path)
-
-            # Append to final dataset
-            data_row = {"prompt": prompt, "win_image": win_path}
-            for k in range(16):
-                data_row[f"lose_image{k+1}"] = lose_paths[k]
-
-            final_dataset = pd.concat([final_dataset, pd.DataFrame([data_row])], ignore_index=True)
-
-        except Exception as e:
-            print(f"Error on row {i}: {e}")
-            continue
-
+    # Create final dataset
+    final_dataset = pd.DataFrame(all_results)
+    
     # Save full dataset
     final_dataset.to_csv("final_dataset.csv", index=False)
+    print(f"Saved {len(final_dataset)} processed rows to final_dataset.csv")
 
     # Save each difficulty level (16 files)
     for k in range(1, 17):
         df_k = final_dataset[["prompt", "win_image", f"lose_image{k}"]]
         df_k.to_csv(f"df_level{k}.csv", index=False)
 
-        
-
-
-        
+    print("Processing completed!")
