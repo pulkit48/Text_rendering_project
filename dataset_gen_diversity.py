@@ -2,17 +2,16 @@ import cv2
 import numpy as np
 import random
 import pandas as pd
-from PIL import Image, ImageEnhance, ImageFilter, ImageOps
+from PIL import Image, ImageOps
 import os
-import math
-import io
-import shutil
-import requests
-from datasets import load_dataset,concatenate_datasets
-from tqdm import tqdm
-from multiprocessing import Pool, cpu_count
-from functools import partial
-import multiprocessing as mp
+from datasets import load_dataset
+import matplotlib.pyplot as plt
+import cv2
+import textwrap
+
+from skimage import transform, img_as_ubyte
+import matplotlib.pyplot as plt
+
 
 # --- Distortion Function Definitions (Reduced Intensity) ---
 
@@ -22,16 +21,6 @@ def apply_gaussian_blur(image_np): # Renamed back from 'heavy'
     ksize = random.randrange(3, 15, 2) # Random odd kernel size between 3 and 13
     blurred_image = cv2.GaussianBlur(image_np, (ksize, ksize), 0)
     return blurred_image
-
-def apply_rotation(image_np):
-    """Rotates the entire image by a random angle, replicating borders."""
-    angle = random.uniform(-30, 30) # Reduced angle range
-    (h, w) = image_np.shape[:2]
-    center = (w // 2, h // 2)
-    M = cv2.getRotationMatrix2D(center, angle, 1.0)
-    # Changed borderMode back to replicate to avoid black corners
-    rotated_image = cv2.warpAffine(image_np, M, (w, h), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE)
-    return rotated_image
 
 def apply_partial_rotation(image_np):
     """Rotates a random rectangular portion, using constant fill for contrast."""
@@ -102,63 +91,64 @@ def add_salt_pepper_noise(image_np):
 
     return noisy_image
 
-def add_random_occlusion(image_np):
-    """Adds fewer/smaller random filled shapes."""
+
+def apply_color_jitter(image_np):
+    """Applies small random changes to brightness, contrast, and saturation."""
+    image = image_np.astype(np.float32)
+    alpha = random.uniform(0.8, 1.2)  # contrast
+    beta = random.uniform(-20, 20)   # brightness
+    image = image * alpha + beta
+    image = np.clip(image, 0, 255).astype(np.uint8)
+    return image
+
+
+def apply_pixelation(image_np):
+    """Pixelates one or more random regions of the image."""
     output_image = image_np.copy()
     (h, w) = image_np.shape[:2]
-    num_occlusions = random.randint(1, 3) # Reduced number of occlusions
+    num_blocks = random.randint(1, 4)
+
+    for _ in range(num_blocks):
+        block_w = random.randint(int(w * 0.1), int(w * 0.3))
+        block_h = random.randint(int(h * 0.1), int(h * 0.3))
+        x = random.randint(0, max(0, w - block_w - 1))
+        y = random.randint(0, max(0, h - block_h - 1))
+        region = output_image[y:y + block_h, x:x + block_w]
+
+        pixel_size = random.randint(4, 20)
+        temp = cv2.resize(region, (block_w // pixel_size, block_h // pixel_size), interpolation=cv2.INTER_NEAREST)
+        pixelated = cv2.resize(temp, (block_w, block_h), interpolation=cv2.INTER_NEAREST)
+        output_image[y:y + block_h, x:x + block_w] = pixelated
+
+    return output_image
+
+def erase_with_inpainting(image_np):
+    """Erases random small regions and fills them using surrounding content."""
+    output_image = image_np.copy()
+    (h, w) = image_np.shape[:2]
+    mask = np.zeros((h, w), dtype=np.uint8)  # inpaint mask
+
+    num_occlusions = random.randint(1, 3)
 
     for _ in range(num_occlusions):
-        color_val = random.randint(0, 255)
-        color = (color_val, color_val, color_val)
-        if len(image_np.shape) == 3 and random.random() > 0.3:
-             color = (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
-        elif len(image_np.shape) < 3:
-             color = color_val
-
         shape_type = random.choice(['rectangle', 'circle'])
 
         if shape_type == 'rectangle':
-            # Reduced max size
             occ_w = random.randint(int(w * 0.04), int(w * 0.25))
             occ_h = random.randint(int(h * 0.04), int(h * 0.25))
             occ_x = random.randint(0, max(0, w - occ_w - 1))
             occ_y = random.randint(0, max(0, h - occ_h - 1))
-            cv2.rectangle(output_image, (occ_x, occ_y), (occ_x + occ_w, occ_y + occ_h), color, -1)
-        else: # Circle
-            # Reduced max radius
+            cv2.rectangle(mask, (occ_x, occ_y), (occ_x + occ_w, occ_y + occ_h), 255, -1)
+        else:  # circle
             radius = random.randint(int(min(w, h) * 0.02), int(min(w, h) * 0.12))
             center_x = random.randint(radius, max(radius + 1, w - radius - 1))
             center_y = random.randint(radius, max(radius + 1, h - radius - 1))
-            cv2.circle(output_image, (center_x, center_y), radius, color, -1)
+            cv2.circle(mask, (center_x, center_y), radius, 255, -1)
 
-    return output_image
+    # Inpaint the masked regions using Telea algorithm (alternative: cv2.INPAINT_NS)
+    inpainted = cv2.inpaint(output_image, mask, inpaintRadius=3, flags=cv2.INPAINT_TELEA)
 
-def apply_pixelation(image_np):
-    """Applies light pixelation effect with reduced intensity."""
-    (h, w) = image_np.shape[:2]
-    
-    # Much smaller pixel blocks for subtle effect
-    min_pix_size = max(2, min(h, w) // 150)  # Increased divisor from 80 to 150
-    max_pix_size = max(min_pix_size + 1, min(h, w) // 50)  # Increased divisor from 15 to 50
-    
-    if min_pix_size >= max_pix_size: 
-        max_pix_size = min_pix_size + 1
-    
-    pixel_size = random.randint(min_pix_size, max_pix_size)
-    if pixel_size <= 0: 
-        pixel_size = 2  # Minimum safe value
-    
-    # Apply pixelation
-    temp_img = cv2.resize(image_np, (max(1, w // pixel_size), max(1, h // pixel_size)), interpolation=cv2.INTER_NEAREST)
-    pixelated_image = cv2.resize(temp_img, (w, h), interpolation=cv2.INTER_NEAREST)
-    
-    # Optional: Blend with original for even more subtle effect
-    # Uncomment the next two lines if you want to blend with original image
-    # blend_factor = random.uniform(0.3, 0.7)  # 30-70% pixelation
-    # pixelated_image = cv2.addWeighted(image_np, 1-blend_factor, pixelated_image, blend_factor, 0)
-    
-    return pixelated_image
+    return inpainted
 
 def apply_elastic_transform(image_np): # Renamed back from 'strong'
     """Applies elastic deformation with moderate intensity."""
@@ -181,28 +171,7 @@ def apply_elastic_transform(image_np): # Renamed back from 'strong'
     distorted_image = cv2.remap(image_np, map_x, map_y, interpolation=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REFLECT_101)
     return distorted_image
 
-def apply_cutout(image_np):
-    """Blacks out a smaller random rectangular portion."""
-    output_image = image_np.copy()
-    (h, w) = image_np.shape[:2]
-    # Reduced max cutout size
-    min_dim = min(h, w)
-    cutout_h = random.randint(int(min_dim * 0.05), int(min_dim * 0.30)) # 5% to 30%
-    cutout_w = random.randint(int(min_dim * 0.05), int(min_dim * 0.30))
 
-    cutout_h = min(cutout_h, h - 1)
-    cutout_w = min(cutout_w, w - 1)
-    if cutout_h <=0 or cutout_w <=0:
-        return image_np
-
-    cutout_y = random.randint(0, max(0, h - cutout_h - 1))
-    cutout_x = random.randint(0, max(0, w - cutout_w - 1))
-
-    color = (0, 0, 0)
-    if len(image_np.shape) < 3: color = 0
-
-    cv2.rectangle(output_image, (cutout_x, cutout_y), (cutout_x + cutout_w, cutout_y + cutout_h), color, -1)
-    return output_image
 
 def apply_posterize(image_np):
     """Reduces the number of bits, but less drastically."""
@@ -267,7 +236,7 @@ def apply_distortion(selected_distortion_functions, distorted_image):
             
             try:
                 # print(type(distorted_image))
-                print(distortion_func)
+                # print(distortion_func)
                 temp_distorted_image = distortion_func(distorted_image)
                 if temp_distorted_image is not None:
                     distorted_image = temp_distorted_image
@@ -279,139 +248,102 @@ def apply_distortion(selected_distortion_functions, distorted_image):
     
     return distorted_image
 
-# --- Main Execution Logic ---
-def tensor_to_numpy(tensor_img):
-    """Convert tensor image back to numpy array in OpenCV format"""
-    # tensor_img is expected to be [1, C, H, W] in range [0, 1]
-    if tensor_img.dim() == 4:
-        tensor_img = tensor_img.squeeze(0)  # Remove batch dimension: [C, H, W]
-    
-    # Convert from [C, H, W] to [H, W, C]
-    numpy_img = tensor_img.permute(1, 2, 0).numpy()
-    
-    # Convert from [0, 1] to [0, 255] and to uint8
-    numpy_img = (numpy_img * 255).astype(np.uint8)
-    
-    # Convert from RGB to BGR for OpenCV
-    if numpy_img.shape[2] == 3:
-        numpy_img = cv2.cvtColor(numpy_img, cv2.COLOR_RGB2BGR)
-    
-    return numpy_img
 
-def max_variation_dp(data, k=16):
-    """Dynamic programming approach to select k most varied items."""
-    from functools import lru_cache
-    data = sorted(data, key=lambda x: x[1])
-    N = len(data)
+# === 1. Swirl Distortion ===
+def apply_swirl(img, strength=10, radius=100):
+    img_norm = img / 255.0
+    swirled = transform.swirl(img_norm, strength=strength, radius=radius)
+    return img_as_ubyte(swirled)
 
-    @lru_cache(maxsize=None)
-    def dp(pos, rem, last_score):
-        if rem == 0:
-            return 0, []
-        if pos == N:
-            return float("-inf"), []
+# === 2. Sine Wave Distortion ===
+def sine_wave_distortion(img, amplitude=20, wavelength=50):
+    rows, cols = img.shape[:2]
+    distorted = np.zeros_like(img)
+    for y in range(rows):
+        shift = int(amplitude * np.sin(2 * np.pi * y / wavelength))
+        for c in range(img.shape[2]):
+            distorted[y, :, c] = np.roll(img[y, :, c], shift)
+    return distorted
 
-        take_score = abs(data[pos][1] - last_score) if last_score is not None else 0
-        take_sum, take_list = dp(pos + 1, rem - 1, data[pos][1])
-        take_sum += take_score
+# === 3. Twist (Polar Rotation) Distortion ===
+def twist_distortion(img, strength=5.0):
+    rows, cols = img.shape[:2]
+    center_x, center_y = cols / 2, rows / 2
+    map_x = np.zeros((rows, cols), dtype=np.float32)
+    map_y = np.zeros((rows, cols), dtype=np.float32)
 
-        skip_sum, skip_list = dp(pos + 1, rem, last_score)
+    for y in range(rows):
+        for x in range(cols):
+            dx = x - center_x
+            dy = y - center_y
+            radius = np.sqrt(dx * dx + dy * dy)
+            angle = np.arctan2(dy, dx) + strength * np.exp(-radius / 200)
+            new_x = center_x + radius * np.cos(angle)
+            new_y = center_y + radius * np.sin(angle)
+            map_x[y, x] = np.clip(new_x, 0, cols - 1)
+            map_y[y, x] = np.clip(new_y, 0, rows - 1)
 
-        if take_sum > skip_sum:
-            return take_sum, [data[pos]] + take_list
-        else:
-            return skip_sum, skip_list
+    return cv2.remap(img, map_x, map_y, interpolation=cv2.INTER_LINEAR)
 
-    _, best_subset = dp(0, k, None)
-    return best_subset
+# === 4. Radial Zoom Distortion ===
+def radial_zoom(img, factor=0.001):
+    rows, cols = img.shape[:2]
+    cx, cy = cols / 2, rows / 2
+    map_x = np.zeros((rows, cols), dtype=np.float32)
+    map_y = np.zeros((rows, cols), dtype=np.float32)
 
-def process_single_row(args):
-    """Process a single row of data - this function will be parallelized."""
-    i, row_data, output_dir, available_distortions = args
-    
-    try:
-        # Import required modules inside the function for multiprocessing
-        import torch
-        import torchvision.transforms as T
-        from torchmetrics.multimodal.clip_score import CLIPScore
-        
-        # Initialize CLIP metric for this process
-        clip_metric = CLIPScore(model_name_or_path="openai/clip-vit-base-patch16")
-        
-        prompt = row_data["prompt"]
-        
-        # Decode images
-        nparr = np.frombuffer(row_data["chosen"]['bytes'], np.uint8)
-        win_image = cv2.imdecode(nparr, cv2.IMREAD_COLOR) 
-        nparr = np.frombuffer(row_data["rejected"]['bytes'], np.uint8)
-        lose_image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-        
-        if win_image is None or lose_image is None:
-            return None
+    for y in range(rows):
+        for x in range(cols):
+            dx = x - cx
+            dy = y - cy
+            r = np.sqrt(dx * dx + dy * dy)
+            map_x[y, x] = np.clip(cx + dx * (1 + factor * r), 0, cols - 1)
+            map_y[y, x] = np.clip(cy + dy * (1 + factor * r), 0, rows - 1)
 
-        distorted_images = []
+    return cv2.remap(img, map_x, map_y, interpolation=cv2.INTER_LINEAR)
 
-        # Generate 32 distorted images
-        for _ in range(32):
-            base_image = random.choice([win_image, lose_image])
-            num_ops = random.randint(2, len(available_distortions))
-            funcs = random.choices(available_distortions, k=num_ops)
-            distorted = apply_distortion(funcs, base_image)
-            if distorted is None:
-                continue
-            if distorted.dtype != np.uint8:
-                distorted = np.clip(distorted, 0, 255).astype(np.uint8)
+def visualize_generated_dataset(best_subset, win_image, prompt, win_image_score):
+    fig = plt.figure(figsize=(20, 10))
 
-            transform = T.Compose([
-                T.ToTensor()  # Converts HxWxC in [0, 255] to CxHxW in [0.0, 1.0]
-            ])
-            distorted_tensor = transform(distorted).unsqueeze(0)
-            score = clip_metric(distorted_tensor, prompt)
-            distorted_numpy = tensor_to_numpy(distorted_tensor)  # Convert back to numpy for saving
-            distorted_images.append((distorted_numpy, score))
+    # --- 1. Win image in first row ---
+    ax1 = plt.subplot2grid((3, 8), (0, 3), colspan=2)  # center the win image
+    ax1.imshow(cv2.cvtColor(win_image, cv2.COLOR_BGR2RGB))
+    ax1.set_title(f"{win_image_score:.3f} (Win)", fontsize=10, color='green')
+    ax1.axis('off')
 
-        # Select 16 best varied distorted images
-        best_subset = max_variation_dp(distorted_images, k=16)
-        if len(best_subset) < 16:
-            return None
+    # --- 2. 8 distorted in second row ---
+    for idx in range(8):
+        img, score = best_subset[idx]
+        ax = plt.subplot2grid((3, 8), (1, idx))
+        ax.imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+        ax.set_title(f"Score: {score:.3f}", fontsize=9)
+        ax.axis('off')
 
-        # Save win image
-        win_path = os.path.join(output_dir, "win", f"{i}.png")
-        if win_image.dtype != np.uint8:
-            win_image = np.clip(win_image, 0, 255).astype(np.uint8)
-        cv2.imwrite(win_path, win_image)
+    # --- 3. 8 distorted in third row ---
+    for idx in range(8, 16):
+        img, score = best_subset[idx]
+        ax = plt.subplot2grid((3, 8), (2, idx - 8))
+        ax.imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+        ax.set_title(f"Score: {score:.3f}", fontsize=9)
+        ax.axis('off')
 
-        # Save lose images
-        lose_paths = []
-        for j, (img, _) in enumerate(best_subset):
-            path = os.path.join(output_dir, f"lose{j+1}", f"{i}.png")
-            cv2.imwrite(path, img)
-            lose_paths.append(path)
+    # --- Wrap prompt ---
+    wrapped_prompt = "\n".join(textwrap.wrap(prompt, width=100))
+    plt.tight_layout(rect=[0, 0, 1, 0.93])  # leave space at the top for suptitle
+    plt.suptitle(f"Prompt: {wrapped_prompt}", fontsize=13, y=0.98)
+    plt.subplots_adjust(top=0.88)
+    plt.show()
 
-        # Create data row
-        data_row = {"prompt": prompt, "win_image": win_path}
-        for k in range(16):
-            data_row[f"lose_image{k+1}"] = lose_paths[k]
 
-        return data_row
-
-    except Exception as e:
-        print(f"Error processing row {i}: {e}")
-        return None
-
-def process_chunk(chunk_args):
-    """Process a chunk of rows sequentially within a single process."""
-    chunk_data, output_dir, available_distortions = chunk_args
-    results = []
-    
-    for args in chunk_data:
-        result = process_single_row((*args, output_dir, available_distortions))
-        if result is not None:
-            results.append(result)
-    
-    return results
 
 if __name__ == "__main__":
+    import os
+    import cv2
+    import pandas as pd
+    import numpy as np
+    import random
+    import json
+
     # --- Configuration ---
     output_dir = "dataset"
     if not os.path.exists(output_dir):
@@ -420,66 +352,159 @@ if __name__ == "__main__":
         for n in range(1, 17):  # lose1 to lose16
             os.mkdir(os.path.join(output_dir, f"lose{n}"))
 
+    from datasets import load_dataset
+
     # Load the dataset from Hugging Face
     dataset = load_dataset("data-is-better-together/open-image-preferences-v1-binarized")
     df = pd.DataFrame(dataset['train'])
 
     available_distortions = [
         apply_gaussian_blur,
-        apply_partial_rotation,
+        # apply_rotation,
+        # apply_partial_rotation,
         add_gaussian_noise,
         apply_shear,
         add_salt_pepper_noise,
-        add_random_occlusion,
         apply_pixelation,
         apply_elastic_transform,
-        apply_cutout,
         apply_posterize,
         simulate_jpeg_compression,
         apply_channel_swap,
+        apply_color_jitter,  
+        erase_with_inpainting,
     ]
 
-    # Prepare data for parallel processing
-    num_processes = max(1, cpu_count() - 1)  # Leave one CPU core free
-    print(f"Using {num_processes} processes for parallel processing")
-    
-    # Create chunks of data to reduce memory overhead
-    chunk_size = max(1, len(df) // (num_processes * 4))  # Create more chunks than processes
-    chunks = []
-    
-    for start_idx in range(0, len(df), chunk_size):
-        end_idx = min(start_idx + chunk_size, len(df))
-        chunk_data = []
-        for i in range(start_idx, end_idx):
-            chunk_data.append((i, df.iloc[i]))
-        chunks.append((chunk_data, output_dir, available_distortions))
-    
-    print(f"Processing {len(df)} rows in {len(chunks)} chunks with {num_processes} processes")
+    import ImageReward as RM
+    IM = RM.load("ImageReward-v1.0")
+    # Create DataFrame with columns for 16 losing images
+    lose_cols = [f"lose_image{i}" for i in range(1, 17)]
+    final_dataset = pd.DataFrame(columns=["prompt", "win_image"] + lose_cols)
 
-    # Process chunks in parallel
-    all_results = []
-    with Pool(processes=num_processes) as pool:
-        # Use tqdm for progress tracking
-        chunk_results = list(tqdm(
-            pool.imap(process_chunk, chunks), 
-            total=len(chunks), 
-            desc="Processing chunks"
-        ))
-        
-        # Flatten results
-        for chunk_result in chunk_results:
-            all_results.extend(chunk_result)
+    json_dict_for_scores=[]
+    start=0
+    end=10
 
-    # Create final dataset
-    final_dataset = pd.DataFrame(all_results)
-    
+
+    for i in range(start,end):
+
+        temp_dict={}
+        if i % 100 == 0:
+            print(f"Processing row {i}")
+        prompt = df["prompt"][i]
+
+        try:
+            nparr = np.frombuffer(df["chosen"][i]['bytes'], np.uint8)
+            win_image = cv2.imdecode(nparr, cv2.IMREAD_COLOR) 
+            nparr = np.frombuffer(df["rejected"][i]['bytes'], np.uint8)
+            lose_image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+            if win_image is None or lose_image is None:
+                continue
+
+            distorted_images = []
+
+            # Generate 100 distorted images
+            import time
+            start=time.time()
+            from concurrent.futures import ThreadPoolExecutor, as_completed,ProcessPoolExecutor
+
+            def generate_distorted():
+                base_image = random.choice([win_image, lose_image])
+                num_ops = random.randint(2, len(available_distortions))
+                funcs = random.choices(available_distortions, k=num_ops)
+                distorted = apply_distortion(funcs, base_image)
+                if distorted is None:
+                    return None
+                if distorted.dtype != np.uint8:
+                    distorted = np.clip(distorted, 0, 255).astype(np.uint8)
+                return distorted
+
+            with ThreadPoolExecutor(max_workers=50) as executor:
+                futures = [executor.submit(generate_distorted) for _ in range(150)]
+
+                for future in as_completed(futures):
+                    distorted = future.result()
+                    if distorted is None:
+                        continue
+                    time_start = time.time()
+                    score = IM.score(prompt,Image.fromarray(distorted))
+                    distorted_images.append((distorted, score))
+                    # print(score)
+
+            print(f"Distortion time: {time.time() - start:.2f} seconds")
+            # --- Select 16 best varied distorted images ---
+            def max_variation_dp(data, k=16):
+                from functools import lru_cache
+                data = sorted(data, key=lambda x: x[1])
+                N = len(data)
+
+                @lru_cache(maxsize=None)
+                def dp(pos, rem, last_score):
+                    if rem == 0:
+                        return 0, []
+                    if pos == N:
+                        return float("-inf"), []
+
+                    take_score = abs(data[pos][1] - last_score) if last_score is not None else 0
+                    take_sum, take_list = dp(pos + 1, rem - 1, data[pos][1])
+                    take_sum += take_score
+
+                    skip_sum, skip_list = dp(pos + 1, rem, last_score)
+
+                    if take_sum > skip_sum:
+                        return take_sum, [data[pos]] + take_list
+                    else:
+                        return skip_sum, skip_list
+
+                _, best_subset = dp(0, k, None)
+                return best_subset
+
+            best_subset = max_variation_dp(distorted_images, k=16)
+            if len(best_subset) < 16:
+                continue
+
+            # Save win image
+            win_path = os.path.join(output_dir, "win", f"{i}.png")
+            if win_image.dtype != np.uint8:
+                win_image = np.clip(win_image, 0, 255).astype(np.uint8)
+            cv2.imwrite(win_path, win_image)
+
+            import matplotlib.pyplot as plt
+
+            lose_paths = []
+            for j, (img, score_val) in enumerate(best_subset):
+                path = os.path.join(output_dir, f"lose{j+1}", f"{i}.png")
+                cv2.imwrite(path, img)
+                lose_paths.append(path)
+                temp_dict[j+1]=score_val
+
+            win_image_score= IM.score(prompt, Image.fromarray(win_image))
+            temp_dict['win_image_score']=win_image_score
+            visualize_generated_dataset(best_subset, win_image, prompt,win_image_score)
+
+            # Append to final dataset
+            data_row = {"prompt": prompt, "win_image": win_path}
+            for k in range(16):
+                data_row[f"lose_image{k+1}"] = lose_paths[k]
+
+            final_dataset = pd.concat([final_dataset, pd.DataFrame([data_row])], ignore_index=True)
+
+        except Exception as e:
+            print(f"Error on row {i}: {e}")
+            continue
+
+        json_dict_for_scores.append({i: temp_dict})
+        if i%100==0:
+            with open("data.json",'w') as f:
+                json.dump(json_dict_for_scores, f, indent=4)
     # Save full dataset
-    final_dataset.to_csv("final_dataset.csv", index=False)
-    print(f"Saved {len(final_dataset)} processed rows to final_dataset.csv")
+    final_dataset.to_csv(f"final_dataset_{start}_{end}.csv", index=False)
 
     # Save each difficulty level (16 files)
-    for k in range(1, 17):
-        df_k = final_dataset[["prompt", "win_image", f"lose_image{k}"]]
-        df_k.to_csv(f"df_level{k}.csv", index=False)
+    # for k in range(1, 17):
+    #     df_k = final_dataset[["prompt", "win_image", f"lose_image{k}"]]
+    #     df_k.to_csv(f"df_level{k}.csv", index=False)
 
-    print("Processing completed!")
+        
+
+
+        
