@@ -401,6 +401,10 @@ if __name__ == "__main__":
         apply_channel_swap,
         apply_color_jitter,  
         erase_with_inpainting,
+        apply_swirl,
+        sine_wave_distortion,
+        twist_distortion,
+        radial_zoom
     ]
 
     import ImageReward as RM
