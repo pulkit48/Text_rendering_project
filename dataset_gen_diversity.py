@@ -545,7 +545,7 @@ if __name__ == "__main__":
                     distorted_images.append((distorted, score))
                     # print(score)
             
-            if i % 2 == 0:  # Note: Use ==, not just `if i % 200`
+            if i % 200 == 0:  # Note: Use ==, not just `if i % 200`
                 save_folder_path=os.path.join(output_dir, f"ckpt_{i}")
                 os.makedirs(save_folder_path, exist_ok=True)
                 for idx, (img, _) in enumerate(distorted_images):
