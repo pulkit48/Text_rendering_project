@@ -334,6 +334,35 @@ def visualize_generated_dataset(best_subset, win_image, prompt, win_image_score)
     plt.subplots_adjust(top=0.88)
     plt.show()
 
+import random
+
+def generate_sequence(min_val, max_val, total_count):
+    sequence = []
+    remaining = total_count
+    
+    values = list(range(min_val, max_val + 1))
+    random.shuffle(values)
+    
+    for value in values:
+        if remaining <= 0:
+            break
+        
+        if remaining == 1:
+            count = 1
+        else:
+            max_count = min(remaining, remaining // len([v for v in values if v >= value]) + 1)
+            count = random.randint(1, max(1, max_count))
+        
+        sequence.extend([value] * count)
+        remaining -= count
+    
+    while remaining > 0:
+        value = random.choice(values)
+        sequence.append(value)
+        remaining -= 1
+    
+    return sorted(sequence)
+
 
 
 if __name__ == "__main__":
@@ -383,7 +412,9 @@ if __name__ == "__main__":
     json_dict_for_scores=[]
     start=0
     end=10
-
+    min_val=3
+    max_val=11
+    total_sample=150
 
     for i in range(start,end):
 
@@ -407,9 +438,10 @@ if __name__ == "__main__":
             start=time.time()
             from concurrent.futures import ThreadPoolExecutor, as_completed,ProcessPoolExecutor
 
-            def generate_distorted():
+            seq=generate_sequence(min_val,max_val,total_sample)
+            def generate_distorted(i):
                 base_image = random.choice([win_image, lose_image])
-                num_ops = random.randint(2, len(available_distortions))
+                num_ops = random.randint(seq[i], len(available_distortions))
                 funcs = random.choices(available_distortions, k=num_ops)
                 distorted = apply_distortion(funcs, base_image)
                 if distorted is None:
@@ -419,7 +451,7 @@ if __name__ == "__main__":
                 return distorted
 
             with ThreadPoolExecutor(max_workers=50) as executor:
-                futures = [executor.submit(generate_distorted) for _ in range(150)]
+                futures = [executor.submit(generate_distorted,ind) for ind in range(total_sample)]
 
                 for future in as_completed(futures):
                     distorted = future.result()
