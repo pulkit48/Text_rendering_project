@@ -11,6 +11,19 @@ import textwrap
 
 from skimage import transform, img_as_ubyte
 import matplotlib.pyplot as plt
+import os
+import cv2
+import pandas as pd
+import numpy as np
+import random
+import json
+from datasets import load_dataset
+import ImageReward as RM
+from concurrent.futures import ThreadPoolExecutor, as_completed,ProcessPoolExecutor
+import cv2
+import numpy as np
+from skimage import transform
+from skimage.util import img_as_ubyte
 
 
 # --- Distortion Function Definitions (Reduced Intensity) ---
@@ -249,58 +262,120 @@ def apply_distortion(selected_distortion_functions, distorted_image):
     return distorted_image
 
 
+
+
+# === Helper Function (inside distortions) ===
+def _generate_random_mask(img_shape, num_points=10):
+    mask = np.zeros(img_shape[:2], dtype=np.uint8)
+    h, w = img_shape[:2]
+    points = np.random.randint(0, min(w, h), size=(num_points, 2))
+    points = cv2.convexHull(points)
+    cv2.fillConvexPoly(mask, points, 255)
+    return mask
+
+def _blend_with_mask(original, distorted, mask, blur_size=21):
+    # Normalize blurred mask to range [0, 1] for alpha blending
+    blurred_mask = cv2.GaussianBlur(mask, (blur_size, blur_size), 0)
+    alpha = blurred_mask.astype(np.float32) / 255.0
+
+    # Ensure 3 channels
+    if len(original.shape) == 2 or original.shape[2] == 1:
+        original = cv2.cvtColor(original, cv2.COLOR_GRAY2BGR)
+        distorted = cv2.cvtColor(distorted, cv2.COLOR_GRAY2BGR)
+
+    # Expand alpha to 3 channels
+    alpha = cv2.merge([alpha] * 3)
+
+    # Blend
+    blended = (alpha * distorted + (1 - alpha) * original).astype(np.uint8)
+    return blended
+
+
 # === 1. Swirl Distortion ===
-def apply_swirl(img, strength=10, radius=100):
+def apply_swirl(img):
+    strength = random.uniform(10, 20)  # Reduced strength for less distortion
+    radius= random.uniform(100, 300)  # Reduced radius for less distortion
     img_norm = img / 255.0
-    swirled = transform.swirl(img_norm, strength=strength, radius=radius)
-    return img_as_ubyte(swirled)
+
+    # Generate random mask
+    mask = _generate_random_mask(img.shape, num_points=np.random.randint(6, 15))
+
+    # Compute center of mass of the mask (as swirl center)
+    moments = cv2.moments(mask)
+    if moments["m00"] != 0:
+        cx = int(moments["m10"] / moments["m00"])
+        cy = int(moments["m01"] / moments["m00"])
+        swirl_center = (cx, cy)
+    else:
+        swirl_center = (img.shape[1] // 2, img.shape[0] // 2)  # fallback to center
+
+    # Apply swirl at computed center
+    swirled = transform.swirl(img_norm, strength=strength, radius=radius, center=swirl_center)
+    swirled = img_as_ubyte(swirled)
+
+    return _blend_with_mask(img, swirled, mask)
+
 
 # === 2. Sine Wave Distortion ===
 def sine_wave_distortion(img, amplitude=20, wavelength=50):
     rows, cols = img.shape[:2]
-    distorted = np.zeros_like(img)
+    y_indices = np.arange(rows)
+    shifts = (amplitude * np.sin(2 * np.pi * y_indices / wavelength)).astype(int)
+    x_coords = np.arange(cols)
+    map_x = np.zeros((rows, cols), dtype=np.float32)
     for y in range(rows):
-        shift = int(amplitude * np.sin(2 * np.pi * y / wavelength))
-        for c in range(img.shape[2]):
-            distorted[y, :, c] = np.roll(img[y, :, c], shift)
-    return distorted
+        map_x[y, :] = (x_coords - shifts[y]) % cols
+    map_y = np.repeat(np.arange(rows)[:, np.newaxis], cols, axis=1).astype(np.float32)
+    distorted = cv2.remap(img, map_x, map_y, interpolation=cv2.INTER_LINEAR)
+
+    mask = _generate_random_mask(img.shape, num_points=np.random.randint(6, 15))
+    return _blend_with_mask(img, distorted, mask)
 
 # === 3. Twist (Polar Rotation) Distortion ===
 def twist_distortion(img, strength=5.0):
     rows, cols = img.shape[:2]
     center_x, center_y = cols / 2, rows / 2
-    map_x = np.zeros((rows, cols), dtype=np.float32)
-    map_y = np.zeros((rows, cols), dtype=np.float32)
+    step = max(1, min(rows, cols) // 150)
+    y_indices = np.arange(0, rows, step)
+    x_indices = np.arange(0, cols, step)
+    x_grid, y_grid = np.meshgrid(x_indices, y_indices)
+    dx = x_grid - center_x
+    dy = y_grid - center_y
+    radius = np.sqrt(dx * dx + dy * dy)
+    angle = np.arctan2(dy, dx) + strength * np.exp(-radius / 200)
+    new_x = center_x + radius * np.cos(angle)
+    new_y = center_y + radius * np.sin(angle)
+    map_x = cv2.resize(new_x, (cols, rows)).astype(np.float32)
+    map_y = cv2.resize(new_y, (cols, rows)).astype(np.float32)
+    map_x = np.clip(map_x, 0, cols - 1)
+    map_y = np.clip(map_y, 0, rows - 1)
+    distorted = cv2.remap(img, map_x, map_y, interpolation=cv2.INTER_LINEAR)
 
-    for y in range(rows):
-        for x in range(cols):
-            dx = x - center_x
-            dy = y - center_y
-            radius = np.sqrt(dx * dx + dy * dy)
-            angle = np.arctan2(dy, dx) + strength * np.exp(-radius / 200)
-            new_x = center_x + radius * np.cos(angle)
-            new_y = center_y + radius * np.sin(angle)
-            map_x[y, x] = np.clip(new_x, 0, cols - 1)
-            map_y[y, x] = np.clip(new_y, 0, rows - 1)
-
-    return cv2.remap(img, map_x, map_y, interpolation=cv2.INTER_LINEAR)
+    mask = _generate_random_mask(img.shape, num_points=np.random.randint(6, 15))
+    return _blend_with_mask(img, distorted, mask)
 
 # === 4. Radial Zoom Distortion ===
 def radial_zoom(img, factor=0.001):
     rows, cols = img.shape[:2]
     cx, cy = cols / 2, rows / 2
-    map_x = np.zeros((rows, cols), dtype=np.float32)
-    map_y = np.zeros((rows, cols), dtype=np.float32)
+    step = max(1, min(rows, cols) // 200)
+    y_indices = np.arange(0, rows, step)
+    x_indices = np.arange(0, cols, step)
+    x_grid, y_grid = np.meshgrid(x_indices, y_indices)
+    dx = x_grid - cx
+    dy = y_grid - cy
+    r = np.sqrt(dx * dx + dy * dy)
+    map_x_small = cx + dx * (1 + factor * r)
+    map_y_small = cy + dy * (1 + factor * r)
+    map_x = cv2.resize(map_x_small, (cols, rows)).astype(np.float32)
+    map_y = cv2.resize(map_y_small, (cols, rows)).astype(np.float32)
+    map_x = np.clip(map_x, 0, cols - 1)
+    map_y = np.clip(map_y, 0, rows - 1)
+    distorted = cv2.remap(img, map_x, map_y, interpolation=cv2.INTER_LINEAR)
 
-    for y in range(rows):
-        for x in range(cols):
-            dx = x - cx
-            dy = y - cy
-            r = np.sqrt(dx * dx + dy * dy)
-            map_x[y, x] = np.clip(cx + dx * (1 + factor * r), 0, cols - 1)
-            map_y[y, x] = np.clip(cy + dy * (1 + factor * r), 0, rows - 1)
+    mask = _generate_random_mask(img.shape, num_points=np.random.randint(6, 15))
+    return _blend_with_mask(img, distorted, mask)
 
-    return cv2.remap(img, map_x, map_y, interpolation=cv2.INTER_LINEAR)
 
 def visualize_generated_dataset(best_subset, win_image, prompt, win_image_score):
     fig = plt.figure(figsize=(20, 10))
@@ -366,22 +441,24 @@ def generate_sequence(min_val, max_val, total_count):
 
 
 if __name__ == "__main__":
-    import os
-    import cv2
-    import pandas as pd
-    import numpy as np
-    import random
-    import json
+    
+    # # Pulkit- Just change the start and end values
+    start=0
+    end=10
+    type_of_process=1 
+    min_val=3
+    max_val=11
+    total_sample=150
 
-    # --- Configuration ---
     output_dir = "dataset"
+    final_csv_path=os.path.join(output_dir,f"final_dataset_{start}_{end}")
+    final_json_path=os.path.join(output_dir,f"scores_data_{start}_{end}")
     if not os.path.exists(output_dir):
         os.mkdir(output_dir)
         os.mkdir(os.path.join(output_dir, "win"))
         for n in range(1, 17):  # lose1 to lose16
             os.mkdir(os.path.join(output_dir, f"lose{n}"))
 
-    from datasets import load_dataset
 
     # Load the dataset from Hugging Face
     dataset = load_dataset("data-is-better-together/open-image-preferences-v1-binarized")
@@ -407,18 +484,13 @@ if __name__ == "__main__":
         radial_zoom
     ]
 
-    import ImageReward as RM
     IM = RM.load("ImageReward-v1.0")
     # Create DataFrame with columns for 16 losing images
     lose_cols = [f"lose_image{i}" for i in range(1, 17)]
     final_dataset = pd.DataFrame(columns=["prompt", "win_image"] + lose_cols)
 
     json_dict_for_scores=[]
-    start=0
-    end=10
-    min_val=3
-    max_val=11
-    total_sample=150
+
 
     for i in range(start,end):
 
@@ -440,12 +512,19 @@ if __name__ == "__main__":
             # Generate 100 distorted images
             import time
             start=time.time()
-            from concurrent.futures import ThreadPoolExecutor, as_completed,ProcessPoolExecutor
+            
+            if type_of_process==2:
+                seq=generate_sequence(min_val,max_val,total_sample)
 
-            seq=generate_sequence(min_val,max_val,total_sample)
-            def generate_distorted(i):
+            def generate_distorted(ind):
+                # print(ind)
+
                 base_image = random.choice([win_image, lose_image])
-                num_ops = random.randint(seq[i], len(available_distortions))
+                if type_of_process==2:
+                    num_ops = random.randint(seq[ind], len(available_distortions))
+                else:
+                    num_ops = random.randint(3, len(available_distortions))
+
                 funcs = random.choices(available_distortions, k=num_ops)
                 distorted = apply_distortion(funcs, base_image)
                 if distorted is None:
@@ -454,7 +533,7 @@ if __name__ == "__main__":
                     distorted = np.clip(distorted, 0, 255).astype(np.uint8)
                 return distorted
 
-            with ThreadPoolExecutor(max_workers=50) as executor:
+            with ProcessPoolExecutor(max_workers=50) as executor:
                 futures = [executor.submit(generate_distorted,ind) for ind in range(total_sample)]
 
                 for future in as_completed(futures):
@@ -465,36 +544,59 @@ if __name__ == "__main__":
                     score = IM.score(prompt,Image.fromarray(distorted))
                     distorted_images.append((distorted, score))
                     # print(score)
+            
+            if i % 2 == 0:  # Note: Use ==, not just `if i % 200`
+                save_folder_path=os.path.join(output_dir, f"ckpt_{i}")
+                os.makedirs(save_folder_path, exist_ok=True)
+                for idx, (img, _) in enumerate(distorted_images):
+                    save_path=os.path.join(save_folder_path,f'{idx}.png')
+                    cv2.imwrite(save_path, img)
+
 
             print(f"Distortion time: {time.time() - start:.2f} seconds")
             # --- Select 16 best varied distorted images ---
             def max_variation_dp(data, k=16):
                 from functools import lru_cache
+
                 data = sorted(data, key=lambda x: x[1])
+                values = [val for val in data]
+                scores = [val[1] for val in data]
                 N = len(data)
 
+                # Use indices instead of actual score values to make caching effective
                 @lru_cache(maxsize=None)
-                def dp(pos, rem, last_score):
+                def dp(pos, rem, last_idx):
                     if rem == 0:
                         return 0, []
                     if pos == N:
                         return float("-inf"), []
 
-                    take_score = abs(data[pos][1] - last_score) if last_score is not None else 0
-                    take_sum, take_list = dp(pos + 1, rem - 1, data[pos][1])
+                    # Option 1: Take current element
+                    take_score = abs(scores[pos] - scores[last_idx]) if last_idx != -1 else 0
+                    take_sum, take_list = dp(pos + 1, rem - 1, pos)
                     take_sum += take_score
 
-                    skip_sum, skip_list = dp(pos + 1, rem, last_score)
+                    # Option 2: Skip current element
+                    skip_sum, skip_list = dp(pos + 1, rem, last_idx)
 
                     if take_sum > skip_sum:
-                        return take_sum, [data[pos]] + take_list
+                        return take_sum, [values[pos]] + take_list
                     else:
                         return skip_sum, skip_list
 
-                _, best_subset = dp(0, k, None)
+                _, best_subset = dp(0, k, -1)
                 return best_subset
 
-            best_subset = max_variation_dp(distorted_images, k=16)
+
+            distorted_images = sorted(distorted_images, key=lambda x: x[1])
+            distorted_images1= distorted_images[:len(distorted_images)//3]
+            distorted_images2= distorted_images[len(distorted_images)//3:len(distorted_images)//2]
+            distorted_images3= distorted_images[len(distorted_images)//2:]
+            best_subset = max_variation_dp(distorted_images1, k=5)
+            best_subset += max_variation_dp(distorted_images2, k=5)
+            best_subset+=max_variation_dp(distorted_images3, k=6)
+
+            best_subset=sorted(best_subset, key=lambda x: x[1])
             if len(best_subset) < 16:
                 continue
 
@@ -515,6 +617,8 @@ if __name__ == "__main__":
 
             win_image_score= IM.score(prompt, Image.fromarray(win_image))
             temp_dict['win_image_score']=win_image_score
+
+            #Pulkit- Comment this line to avoid visualization
             visualize_generated_dataset(best_subset, win_image, prompt,win_image_score)
 
             # Append to final dataset
@@ -529,11 +633,11 @@ if __name__ == "__main__":
             continue
 
         json_dict_for_scores.append({i: temp_dict})
-        if i%100==0:
-            with open("data.json",'w') as f:
-                json.dump(json_dict_for_scores, f, indent=4)
+        # if i%100==0:
+        with open(final_json_path,'w') as f:
+            json.dump(json_dict_for_scores, f, indent=4)
     # Save full dataset
-    final_dataset.to_csv(f"final_dataset_{start}_{end}.csv", index=False)
+    final_dataset.to_csv(final_csv_path, index=False)
 
     # Save each difficulty level (16 files)
     # for k in range(1, 17):
