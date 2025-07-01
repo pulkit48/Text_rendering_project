@@ -449,6 +449,7 @@ if __name__ == "__main__":
     min_val=3
     max_val=11
     total_sample=150
+    batch_size=16
 
     output_dir = "dataset"
     final_csv_path=os.path.join(output_dir,f"final_dataset_{start}_{end}")
@@ -456,7 +457,7 @@ if __name__ == "__main__":
     if not os.path.exists(output_dir):
         os.mkdir(output_dir)
         os.mkdir(os.path.join(output_dir, "win"))
-        for n in range(1, 17):  # lose1 to lose16
+        for n in range(1, batch_size+1):  # lose1 to lose16
             os.mkdir(os.path.join(output_dir, f"lose{n}"))
 
 
@@ -486,7 +487,7 @@ if __name__ == "__main__":
 
     IM = RM.load("ImageReward-v1.0")
     # Create DataFrame with columns for 16 losing images
-    lose_cols = [f"lose_image{i}" for i in range(1, 17)]
+    lose_cols = [f"lose_image{i}" for i in range(1, batch_size+1)]
     final_dataset = pd.DataFrame(columns=["prompt", "win_image"] + lose_cols)
 
     json_dict_for_scores=[]
@@ -555,7 +556,7 @@ if __name__ == "__main__":
 
             print(f"Distortion time: {time.time() - start:.2f} seconds")
             # --- Select 16 best varied distorted images ---
-            def max_variation_dp(data, k=16):
+            def max_variation_dp(data, k):
                 from functools import lru_cache
 
                 data = sorted(data, key=lambda x: x[1])
@@ -592,12 +593,13 @@ if __name__ == "__main__":
             distorted_images1= distorted_images[:len(distorted_images)//3]
             distorted_images2= distorted_images[len(distorted_images)//3:len(distorted_images)//2]
             distorted_images3= distorted_images[len(distorted_images)//2:]
-            best_subset = max_variation_dp(distorted_images1, k=5)
-            best_subset += max_variation_dp(distorted_images2, k=5)
-            best_subset+=max_variation_dp(distorted_images3, k=6)
+            sample_from_each_bucket=batch_size//3
+            best_subset = max_variation_dp(distorted_images1, k=sample_from_each_bucket)
+            best_subset += max_variation_dp(distorted_images2, k=sample_from_each_bucket)
+            best_subset+=max_variation_dp(distorted_images3, k=batch_size-2*sample_from_each_bucket)
 
             best_subset=sorted(best_subset, key=lambda x: x[1])
-            if len(best_subset) < 16:
+            if len(best_subset) < batch_size:
                 continue
 
             # Save win image
