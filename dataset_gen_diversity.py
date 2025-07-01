@@ -457,7 +457,7 @@ if __name__ == "__main__":
     if not os.path.exists(output_dir):
         os.mkdir(output_dir)
         os.mkdir(os.path.join(output_dir, "win"))
-        for n in range(1, batch_size+1):  # lose1 to lose16
+        for n in range(1, batch_size+1):  
             os.mkdir(os.path.join(output_dir, f"lose{n}"))
 
 
@@ -486,7 +486,6 @@ if __name__ == "__main__":
     ]
 
     IM = RM.load("ImageReward-v1.0")
-    # Create DataFrame with columns for 16 losing images
     lose_cols = [f"lose_image{i}" for i in range(1, batch_size+1)]
     final_dataset = pd.DataFrame(columns=["prompt", "win_image"] + lose_cols)
 
@@ -555,7 +554,6 @@ if __name__ == "__main__":
 
 
             print(f"Distortion time: {time.time() - start:.2f} seconds")
-            # --- Select 16 best varied distorted images ---
             def max_variation_dp(data, k):
                 from functools import lru_cache
 
@@ -625,7 +623,7 @@ if __name__ == "__main__":
 
             # Append to final dataset
             data_row = {"prompt": prompt, "win_image": win_path}
-            for k in range(16):
+            for k in range(batch_size):
                 data_row[f"lose_image{k+1}"] = lose_paths[k]
 
             final_dataset = pd.concat([final_dataset, pd.DataFrame([data_row])], ignore_index=True)
@@ -641,11 +639,7 @@ if __name__ == "__main__":
     # Save full dataset
     final_dataset.to_csv(final_csv_path, index=False)
 
-    # Save each difficulty level (16 files)
-    # for k in range(1, 17):
-    #     df_k = final_dataset[["prompt", "win_image", f"lose_image{k}"]]
-    #     df_k.to_csv(f"df_level{k}.csv", index=False)
-
+   
         
 
 
