@@ -35,31 +35,6 @@ def apply_gaussian_blur(image_np): # Renamed back from 'heavy'
     blurred_image = cv2.GaussianBlur(image_np, (ksize, ksize), 0)
     return blurred_image
 
-def apply_partial_rotation(image_np):
-    """Rotates a random rectangular portion, using constant fill for contrast."""
-    (h, w) = image_np.shape[:2]
-    min_size_ratio = 0.15 # Slightly smaller min
-    max_size_ratio = 0.50 # Reduced max size
-    roi_w = random.randint(int(w * min_size_ratio), int(w * max_size_ratio))
-    roi_h = random.randint(int(h * min_size_ratio), int(h * max_size_ratio))
-    roi_x = random.randint(0, max(0, w - roi_w - 1))
-    roi_y = random.randint(0, max(0, h - roi_h - 1))
-    roi = image_np[roi_y:roi_y + roi_h, roi_x:roi_x + roi_w]
-    angle = random.uniform(-90, 90) # Reduced angle range for partial
-    (roi_h_actual, roi_w_actual) = roi.shape[:2]
-    if roi_h_actual == 0 or roi_w_actual == 0:
-        return image_np
-    roi_center = (roi_w_actual // 2, roi_h_actual // 2)
-    M = cv2.getRotationMatrix2D(roi_center, angle, 1.0)
-    # Keep constant border for this one to make the rotated patch distinct, maybe gray?
-    fill_color_val = random.randint(50, 200)
-    fill_color = (fill_color_val, fill_color_val, fill_color_val)
-    if len(image_np.shape) < 3: fill_color = fill_color_val
-    rotated_roi = cv2.warpAffine(roi, M, (roi_w_actual, roi_h_actual), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT, borderValue=fill_color)
-    output_image = image_np.copy()
-    output_image[roi_y:roi_y + roi_h, roi_x:roi_x + roi_w] = rotated_roi
-    return output_image
-
 
 def add_gaussian_noise(image_np): # Renamed back from 'heavy'
     """Adds moderate Gaussian noise."""
@@ -243,27 +218,6 @@ def apply_channel_swap(image_np):
 
     return output_image
 
-def apply_distortion(selected_distortion_functions, distorted_image):
-    
-    for i, distortion_func in enumerate(selected_distortion_functions):
-            
-            try:
-                # print(type(distorted_image))
-                # print(distortion_func)
-                temp_distorted_image = distortion_func(distorted_image)
-                if temp_distorted_image is not None:
-                    distorted_image = temp_distorted_image
-                
-            except Exception as e:
-                print(e)
-                # return None
-                
-    
-    return distorted_image
-
-
-
-
 # === Helper Function (inside distortions) ===
 def _generate_random_mask(img_shape, num_points=10):
     mask = np.zeros(img_shape[:2], dtype=np.uint8)
@@ -377,37 +331,23 @@ def radial_zoom(img, factor=0.001):
     return _blend_with_mask(img, distorted, mask)
 
 
-def visualize_generated_dataset(best_subset, win_image, prompt, win_image_score):
-    fig = plt.figure(figsize=(20, 10))
-
-    # --- 1. Win image in first row ---
-    ax1 = plt.subplot2grid((3, 8), (0, 3), colspan=2)  # center the win image
-    ax1.imshow(cv2.cvtColor(win_image, cv2.COLOR_BGR2RGB))
-    ax1.set_title(f"{win_image_score:.3f} (Win)", fontsize=10, color='green')
-    ax1.axis('off')
-
-    # --- 2. 8 distorted in second row ---
-    for idx in range(8):
-        img, score = best_subset[idx]
-        ax = plt.subplot2grid((3, 8), (1, idx))
-        ax.imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
-        ax.set_title(f"Score: {score:.3f}", fontsize=9)
-        ax.axis('off')
-
-    # --- 3. 8 distorted in third row ---
-    for idx in range(8, 16):
-        img, score = best_subset[idx]
-        ax = plt.subplot2grid((3, 8), (2, idx - 8))
-        ax.imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
-        ax.set_title(f"Score: {score:.3f}", fontsize=9)
-        ax.axis('off')
-
-    # --- Wrap prompt ---
-    wrapped_prompt = "\n".join(textwrap.wrap(prompt, width=100))
-    plt.tight_layout(rect=[0, 0, 1, 0.93])  # leave space at the top for suptitle
-    plt.suptitle(f"Prompt: {wrapped_prompt}", fontsize=13, y=0.98)
-    plt.subplots_adjust(top=0.88)
-    plt.show()
+def apply_distortion(selected_distortion_functions, distorted_image):
+    
+    for i, distortion_func in enumerate(selected_distortion_functions):
+            
+            try:
+                # print(type(distorted_image))
+                # print(distortion_func)
+                temp_distorted_image = distortion_func(distorted_image)
+                if temp_distorted_image is not None:
+                    distorted_image = temp_distorted_image
+                
+            except Exception as e:
+                print(e)
+                # return None
+                
+    
+    return distorted_image
 
 import random
 
