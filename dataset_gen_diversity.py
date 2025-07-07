@@ -559,7 +559,7 @@ if __name__ == "__main__":
             temp_dict['win_image_score']=win_image_score
 
             #Pulkit- Comment this line to avoid visualization
-            visualize_generated_dataset(best_subset, win_image, prompt,win_image_score)
+            # visualize_generated_dataset(best_subset, win_image, prompt,win_image_score)
 
             # Append to final dataset
             data_row = {"prompt": prompt, "win_image": win_path}
