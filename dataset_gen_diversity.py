@@ -39,7 +39,7 @@ def apply_gaussian_blur(image_np): # Renamed back from 'heavy'
 def add_gaussian_noise(image_np): # Renamed back from 'heavy'
     """Adds moderate Gaussian noise."""
     mean = 0
-    std_dev = random.uniform(5, 25) # Reduced standard deviation range
+    std_dev = random.uniform(5, 40) # Reduced standard deviation range
     (h, w) = image_np.shape[:2]
     if len(image_np.shape) == 3:
         noise = np.random.normal(mean, std_dev, (h, w, 3))
