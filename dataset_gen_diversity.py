@@ -83,7 +83,7 @@ def add_salt_pepper_noise(image_np):
 def apply_color_jitter(image_np):
     """Applies small random changes to brightness, contrast, and saturation."""
     image = image_np.astype(np.float32)
-    alpha = random.uniform(0.8, 1.2)  # contrast
+    alpha = random.uniform(0.8, 1.6)  # contrast
     beta = random.uniform(-20, 20)   # brightness
     image = image * alpha + beta
     image = np.clip(image, 0, 255).astype(np.uint8)
