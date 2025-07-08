@@ -61,7 +61,7 @@ def apply_shear(image_np):
 def add_salt_pepper_noise(image_np):
     """Adds salt and pepper noise at lower density."""
     (h, w) = image_np.shape[:2]
-    amount = random.uniform(0.002, 0.03) # Reduced amount (0.2% to 3%)
+    amount = random.uniform(0.002, 0.05) # Reduced amount (0.2% to 3%)
     num_salt = np.ceil(amount * image_np.size * 0.5)
     num_pepper = np.ceil(amount * image_np.size * 0.5)
     noisy_image = image_np.copy()
