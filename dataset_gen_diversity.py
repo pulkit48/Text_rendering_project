@@ -171,7 +171,7 @@ def apply_posterize(image_np):
 
 def simulate_jpeg_compression(image_np):
     """Simulates saving and reloading as a medium-quality JPEG."""
-    quality = random.randint(30, 75) # Higher quality range (less compression artifact)
+    quality = random.randint(1, 40) # Higher quality range (less compression artifact)
     encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), quality]
     result, encoded_img = cv2.imencode('.jpg', image_np, encode_param)
 
