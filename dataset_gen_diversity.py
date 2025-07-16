@@ -164,7 +164,7 @@ def apply_elastic_transform(image_np): # Renamed back from 'strong'
 def apply_posterize(image_np):
     """Reduces the number of bits, but less drastically."""
     image_pil = Image.fromarray(cv2.cvtColor(image_np, cv2.COLOR_BGR2RGB))
-    bits = random.randint(3, 6) # Reduced to 8-64 colors per channel (more bits = less effect)
+    bits = random.randint(1, 6) # Reduced to 8-64 colors per channel (more bits = less effect)
     posterized_pil = ImageOps.posterize(image_pil, bits)
     output_image_np = cv2.cvtColor(np.array(posterized_pil), cv2.COLOR_RGB2BGR)
     return output_image_np
