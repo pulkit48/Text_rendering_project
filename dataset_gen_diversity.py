@@ -140,7 +140,7 @@ def erase_with_inpainting(image_np):
 
 def apply_elastic_transform(image_np): # Renamed back from 'strong'
     """Applies elastic deformation with moderate intensity."""
-    alpha = random.uniform(15, 60) # Reduced intensity range
+    alpha = random.uniform(30, 80) # Reduced intensity range
     img_size = max(image_np.shape[0], image_np.shape[1])
     # Sigma adjusted relative to alpha
     sigma = random.uniform(max(3, img_size * 0.01), max(5, img_size * 0.03))
