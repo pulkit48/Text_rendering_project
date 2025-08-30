@@ -1,4 +1,4 @@
-<mxfile host="app.diagrams.net" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36" version="28.1.0" pages="6">
+<mxfile host="app.diagrams.net" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36" version="28.1.1" pages="6">
   <diagram name="Page-8" id="kobfVtoiC90rkO6BisXb">
     <mxGraphModel dx="1489" dy="-271" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
       <root>
@@ -1796,25 +1796,25 @@
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
-        <mxCell id="B2FjtmVXQP5_vnOM2QB_-1" value="" style="rounded=1;whiteSpace=wrap;html=1;arcSize=3;strokeOpacity=100;container=0;strokeColor=#B3B3B3;strokeWidth=3;fillColor=#FFFFFF;" vertex="1" parent="1">
+        <mxCell id="B2FjtmVXQP5_vnOM2QB_-1" value="" style="rounded=1;whiteSpace=wrap;html=1;arcSize=3;strokeOpacity=100;container=0;strokeColor=#B3B3B3;strokeWidth=3;fillColor=#FFFFFF;" parent="1" vertex="1">
           <mxGeometry x="200" y="300" width="600" height="340" as="geometry" />
         </mxCell>
-        <mxCell id="B2FjtmVXQP5_vnOM2QB_-2" value="" style="rounded=1;whiteSpace=wrap;html=1;arcSize=3;dashed=1;strokeOpacity=100;container=0;fillColor=#e1d5e7;strokeColor=#9673a6;strokeWidth=2;" vertex="1" parent="1">
+        <mxCell id="B2FjtmVXQP5_vnOM2QB_-2" value="" style="rounded=1;whiteSpace=wrap;html=1;arcSize=3;dashed=1;strokeOpacity=100;container=0;fillColor=#E9E9E9;strokeColor=#999999;strokeWidth=2;fontColor=#333333;" parent="1" vertex="1">
           <mxGeometry x="210" y="350" width="580" height="110" as="geometry" />
         </mxCell>
-        <mxCell id="B2FjtmVXQP5_vnOM2QB_-3" value="&lt;div&gt;&lt;font style=&quot;font-size: 18px;&quot; face=&quot;Georgia&quot;&gt;&lt;b style=&quot;&quot;&gt;&quot;भारत सरकार ने मंगलवार को नया शिक्षा नीति लागू किया है, जिसमें बोर्ड परीक्षा को दो बार देने की सुविधा दी गई है।&quot;&lt;/b&gt;&lt;/font&gt;&lt;/div&gt;&lt;div&gt;&lt;font size=&quot;3&quot; face=&quot;Georgia&quot;&gt;&lt;b&gt;(The Government of India implemented a new education policy on Tuesday, which allows students to take board exams twice.)&lt;/b&gt;&lt;/font&gt;&lt;/div&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;container=0;" vertex="1" parent="1">
+        <mxCell id="B2FjtmVXQP5_vnOM2QB_-3" value="&lt;div&gt;&lt;font style=&quot;font-size: 18px;&quot; face=&quot;Georgia&quot;&gt;&lt;b style=&quot;&quot;&gt;&quot;भारत सरकार ने मंगलवार को नया शिक्षा नीति लागू किया है, जिसमें बोर्ड परीक्षा को दो बार देने की सुविधा दी गई है।&quot;&lt;/b&gt;&lt;/font&gt;&lt;/div&gt;&lt;div&gt;&lt;font size=&quot;3&quot; face=&quot;Georgia&quot;&gt;&lt;b&gt;(The Government of India implemented a new education policy on Tuesday, which allows students to take board exams twice.)&lt;/b&gt;&lt;/font&gt;&lt;/div&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;container=0;" parent="1" vertex="1">
           <mxGeometry x="222.5" y="355" width="555" height="100" as="geometry" />
         </mxCell>
-        <mxCell id="B2FjtmVXQP5_vnOM2QB_-4" value="&lt;font face=&quot;Tahoma&quot; color=&quot;#cc0000&quot;&gt;&lt;i style=&quot;&quot;&gt;&lt;b style=&quot;color: light-dark(rgb(204, 0, 0), rgb(255, 163, 163)); font-size: 16px;&quot;&gt;An &lt;/b&gt;&lt;span style=&quot;font-size: 16px;&quot;&gt;&lt;b&gt;excerpt of o&lt;/b&gt;&lt;/span&gt;&lt;b style=&quot;color: light-dark(rgb(204, 0, 0), rgb(255, 163, 163)); font-size: 16px;&quot;&gt;riginal human-written explanation&amp;nbsp;&lt;/b&gt;&lt;/i&gt;&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFEFEC;strokeColor=#d79b00;strokeOpacity=0;" vertex="1" parent="1">
+        <mxCell id="B2FjtmVXQP5_vnOM2QB_-4" value="&lt;font face=&quot;Tahoma&quot; color=&quot;#cc0000&quot;&gt;&lt;i style=&quot;&quot;&gt;&lt;b style=&quot;color: light-dark(rgb(204, 0, 0), rgb(255, 163, 163)); font-size: 16px;&quot;&gt;An &lt;/b&gt;&lt;span style=&quot;font-size: 16px;&quot;&gt;&lt;b&gt;excerpt of o&lt;/b&gt;&lt;/span&gt;&lt;b style=&quot;color: light-dark(rgb(204, 0, 0), rgb(255, 163, 163)); font-size: 16px;&quot;&gt;riginal human-written explanation&amp;nbsp;&lt;/b&gt;&lt;/i&gt;&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFEFEC;strokeColor=#d79b00;strokeOpacity=0;" parent="1" vertex="1">
           <mxGeometry x="210" y="310" width="420" height="30" as="geometry" />
         </mxCell>
-        <mxCell id="B2FjtmVXQP5_vnOM2QB_-5" value="&lt;font face=&quot;Tahoma&quot; color=&quot;#cc0000&quot;&gt;&lt;span style=&quot;font-size: 16px;&quot;&gt;&lt;b&gt;&lt;i&gt;Informative but lacks an explicit explanation, for instance&lt;/i&gt;&lt;/b&gt;&lt;/span&gt;&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFEFEC;strokeColor=#d79b00;strokeOpacity=0;" vertex="1" parent="1">
+        <mxCell id="B2FjtmVXQP5_vnOM2QB_-5" value="&lt;font face=&quot;Tahoma&quot; color=&quot;#cc0000&quot;&gt;&lt;span style=&quot;font-size: 16px;&quot;&gt;&lt;b&gt;&lt;i&gt;Informative but lacks an explicit explanation, for instance&lt;/i&gt;&lt;/b&gt;&lt;/span&gt;&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFEFEC;strokeColor=#d79b00;strokeOpacity=0;" parent="1" vertex="1">
           <mxGeometry x="210" y="480" width="480" height="30" as="geometry" />
         </mxCell>
-        <mxCell id="B2FjtmVXQP5_vnOM2QB_-6" value="" style="rounded=1;whiteSpace=wrap;html=1;arcSize=3;dashed=1;strokeOpacity=100;container=0;fillColor=#e1d5e7;strokeColor=#9673a6;strokeWidth=2;" vertex="1" parent="1">
+        <mxCell id="B2FjtmVXQP5_vnOM2QB_-6" value="" style="rounded=1;whiteSpace=wrap;html=1;arcSize=3;dashed=1;strokeOpacity=100;container=0;fillColor=#E9E9E9;strokeColor=#999999;strokeWidth=2;" parent="1" vertex="1">
           <mxGeometry x="210" y="520" width="580" height="110" as="geometry" />
         </mxCell>
-        <mxCell id="B2FjtmVXQP5_vnOM2QB_-7" value="&lt;div&gt;&lt;font face=&quot;Georgia&quot;&gt;&lt;span style=&quot;font-size: 18px;&quot;&gt;&lt;b&gt;&quot;यह खबर पूरी तरह से सत्य है क्योंकि यह सरकारी दस्तावेज़ों और समाचार स्रोतों द्वारा पुष्टि की गई है।&quot;&lt;/b&gt;&lt;/span&gt;&lt;/font&gt;&lt;/div&gt;&lt;div&gt;&lt;font face=&quot;Georgia&quot;&gt;&lt;span style=&quot;font-size: 18px;&quot;&gt;&lt;b&gt;(This news is completely true as it is confirmed by official documents and news sources.)&lt;/b&gt;&lt;/span&gt;&lt;/font&gt;&lt;/div&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;container=0;" vertex="1" parent="1">
+        <mxCell id="B2FjtmVXQP5_vnOM2QB_-7" value="&lt;div&gt;&lt;font face=&quot;Georgia&quot;&gt;&lt;span style=&quot;font-size: 18px;&quot;&gt;&lt;b&gt;&quot;यह खबर पूरी तरह से सत्य है क्योंकि यह सरकारी दस्तावेज़ों और समाचार स्रोतों द्वारा पुष्टि की गई है।&quot;&lt;/b&gt;&lt;/span&gt;&lt;/font&gt;&lt;/div&gt;&lt;div&gt;&lt;font face=&quot;Georgia&quot;&gt;&lt;span style=&quot;font-size: 18px;&quot;&gt;&lt;b&gt;(This news is completely true as it is confirmed by official documents and news sources.)&lt;/b&gt;&lt;/span&gt;&lt;/font&gt;&lt;/div&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;container=0;" parent="1" vertex="1">
           <mxGeometry x="222.5" y="525" width="555" height="100" as="geometry" />
         </mxCell>
       </root>
