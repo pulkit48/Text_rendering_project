@@ -1,0 +1,750 @@
+{
+  "builder_name": "parquet",
+  "citation": "",
+  "config_name": "default",
+  "dataset_name": "crello",
+  "dataset_size": 8052464514,
+  "description": "",
+  "download_checksums": {
+    "hf://datasets/cyberagent/crello@cc8ab9d272c3f215959eaa40b10f255b80d04bbf/data/train-00000-of-00014.parquet": {
+      "num_bytes": 481469487,
+      "checksum": null
+    },
+    "hf://datasets/cyberagent/crello@cc8ab9d272c3f215959eaa40b10f255b80d04bbf/data/train-00001-of-00014.parquet": {
+      "num_bytes": 469099652,
+      "checksum": null
+    },
+    "hf://datasets/cyberagent/crello@cc8ab9d272c3f215959eaa40b10f255b80d04bbf/data/train-00002-of-00014.parquet": {
+      "num_bytes": 464577769,
+      "checksum": null
+    },
+    "hf://datasets/cyberagent/crello@cc8ab9d272c3f215959eaa40b10f255b80d04bbf/data/train-00003-of-00014.parquet": {
+      "num_bytes": 470578936,
+      "checksum": null
+    },
+    "hf://datasets/cyberagent/crello@cc8ab9d272c3f215959eaa40b10f255b80d04bbf/data/train-00004-of-00014.parquet": {
+      "num_bytes": 473364613,
+      "checksum": null
+    },
+    "hf://datasets/cyberagent/crello@cc8ab9d272c3f215959eaa40b10f255b80d04bbf/data/train-00005-of-00014.parquet": {
+      "num_bytes": 476209807,
+      "checksum": null
+    },
+    "hf://datasets/cyberagent/crello@cc8ab9d272c3f215959eaa40b10f255b80d04bbf/data/train-00006-of-00014.parquet": {
+      "num_bytes": 466741468,
+      "checksum": null
+    },
+    "hf://datasets/cyberagent/crello@cc8ab9d272c3f215959eaa40b10f255b80d04bbf/data/train-00007-of-00014.parquet": {
+      "num_bytes": 495462261,
+      "checksum": null
+    },
+    "hf://datasets/cyberagent/crello@cc8ab9d272c3f215959eaa40b10f255b80d04bbf/data/train-00008-of-00014.parquet": {
+      "num_bytes": 447588440,
+      "checksum": null
+    },
+    "hf://datasets/cyberagent/crello@cc8ab9d272c3f215959eaa40b10f255b80d04bbf/data/train-00009-of-00014.parquet": {
+      "num_bytes": 467649018,
+      "checksum": null
+    },
+    "hf://datasets/cyberagent/crello@cc8ab9d272c3f215959eaa40b10f255b80d04bbf/data/train-00010-of-00014.parquet": {
+      "num_bytes": 462490687,
+      "checksum": null
+    },
+    "hf://datasets/cyberagent/crello@cc8ab9d272c3f215959eaa40b10f255b80d04bbf/data/train-00011-of-00014.parquet": {
+      "num_bytes": 475173411,
+      "checksum": null
+    },
+    "hf://datasets/cyberagent/crello@cc8ab9d272c3f215959eaa40b10f255b80d04bbf/data/train-00012-of-00014.parquet": {
+      "num_bytes": 480935645,
+      "checksum": null
+    },
+    "hf://datasets/cyberagent/crello@cc8ab9d272c3f215959eaa40b10f255b80d04bbf/data/train-00013-of-00014.parquet": {
+      "num_bytes": 485906519,
+      "checksum": null
+    },
+    "hf://datasets/cyberagent/crello@cc8ab9d272c3f215959eaa40b10f255b80d04bbf/data/validation-00000-of-00002.parquet": {
+      "num_bytes": 307950661,
+      "checksum": null
+    },
+    "hf://datasets/cyberagent/crello@cc8ab9d272c3f215959eaa40b10f255b80d04bbf/data/validation-00001-of-00002.parquet": {
+      "num_bytes": 313289001,
+      "checksum": null
+    },
+    "hf://datasets/cyberagent/crello@cc8ab9d272c3f215959eaa40b10f255b80d04bbf/data/test-00000-of-00002.parquet": {
+      "num_bytes": 355628474,
+      "checksum": null
+    },
+    "hf://datasets/cyberagent/crello@cc8ab9d272c3f215959eaa40b10f255b80d04bbf/data/test-00001-of-00002.parquet": {
+      "num_bytes": 357743495,
+      "checksum": null
+    }
+  },
+  "download_size": 7951859344,
+  "features": {
+    "id": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "length": {
+      "dtype": "int64",
+      "_type": "Value"
+    },
+    "group": {
+      "names": [
+        "SM",
+        "HC",
+        "MM",
+        "SMA",
+        "EO",
+        "BG"
+      ],
+      "_type": "ClassLabel"
+    },
+    "format": {
+      "names": [
+        "Instagram Story",
+        "Instagram",
+        "Facebook",
+        "Facebook cover",
+        "Twitter",
+        "Facebook AD",
+        "Poster",
+        "Instagram AD",
+        "Tumblr",
+        "Image",
+        "Pinterest",
+        "Flayer",
+        "FB event cover",
+        "Postcard",
+        "Invitation",
+        "Youtube",
+        "Email header",
+        "Medium Rectangle",
+        "Graphic",
+        "Large Rectangle",
+        "Poster US",
+        "Card",
+        "Logo",
+        "Title",
+        "Skyscraper",
+        "Leaderboard",
+        "Presentation",
+        "Gift Certificate",
+        "VK Universal Post",
+        "Youtube Thumbnail",
+        "Business card",
+        "Book Cover",
+        "Presentation Wide",
+        "VK Community Cover",
+        "Certificate",
+        "Zoom Background",
+        "VK Post with Button",
+        "T-Shirt",
+        "Instagram Highlight Cover",
+        "Coupon",
+        "Letterhead",
+        "IGTV Cover",
+        "Album Cover",
+        "LinkedIn Cover",
+        "Storyboard",
+        "Schedule Planner",
+        "Invoice",
+        "Resume",
+        "Recipe Card",
+        "Menu",
+        "Mood Board",
+        "Mind Map",
+        "Label",
+        "Newsletter",
+        "Brochure",
+        "Ticket",
+        "Proposal",
+        "Snapchat Geofilter",
+        "Snapchat Moment Filter",
+        "Twitch Offline Banner",
+        "Twitch Profile Banner",
+        "Infographic",
+        "Photo Book",
+        "Mobile Presentation",
+        "Web Banner",
+        "Gallery Image",
+        "Calendar"
+      ],
+      "_type": "ClassLabel"
+    },
+    "canvas_width": {
+      "dtype": "int64",
+      "_type": "Value"
+    },
+    "canvas_height": {
+      "dtype": "int64",
+      "_type": "Value"
+    },
+    "category": {
+      "names": [
+        "holidaysCelebration",
+        "foodDrinks",
+        "fashionStyle",
+        "businessFinance",
+        "homeStuff",
+        "handcraftArt",
+        "beauty",
+        "leisureEntertainment",
+        "natureWildlife",
+        "educationScience",
+        "technology",
+        "medical",
+        "socialActivityCharity",
+        "sportExtreme",
+        "realEstateBuilding",
+        "travelsVacations",
+        "pets",
+        "religions",
+        "citiesPlaces",
+        "industry",
+        "transportation",
+        "kidsParents",
+        "all"
+      ],
+      "_type": "ClassLabel"
+    },
+    "title": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "suitability": {
+      "feature": {
+        "names": [
+          "mobile"
+        ],
+        "_type": "ClassLabel"
+      },
+      "_type": "List"
+    },
+    "keywords": {
+      "feature": {
+        "dtype": "string",
+        "_type": "Value"
+      },
+      "_type": "List"
+    },
+    "industries": {
+      "feature": {
+        "names": [
+          "marketingAds",
+          "entertainmentLeisure",
+          "services",
+          "retail",
+          "businessFinance",
+          "educationTraining",
+          "foodBeverages",
+          "artCrafts",
+          "fashionStyle",
+          "healthWellness",
+          "ecologyNature",
+          "nonProfitCharity",
+          "beautyCosmetics",
+          "techGadgets",
+          "homeLiving",
+          "familyKids",
+          "travelTourism",
+          "sportFitness",
+          "corporate",
+          "petsAnimals",
+          "realEstateConstruction",
+          "transportDelivery",
+          "religionFaith",
+          "hrRecruitment"
+        ],
+        "_type": "ClassLabel"
+      },
+      "_type": "List"
+    },
+    "preview": {
+      "_type": "Image"
+    },
+    "type": {
+      "feature": {
+        "names": [
+          "SvgElement",
+          "TextElement",
+          "ImageElement",
+          "ColoredBackground",
+          "SvgMaskElement"
+        ],
+        "_type": "ClassLabel"
+      },
+      "_type": "List"
+    },
+    "left": {
+      "feature": {
+        "dtype": "float32",
+        "_type": "Value"
+      },
+      "_type": "List"
+    },
+    "top": {
+      "feature": {
+        "dtype": "float32",
+        "_type": "Value"
+      },
+      "_type": "List"
+    },
+    "width": {
+      "feature": {
+        "dtype": "float32",
+        "_type": "Value"
+      },
+      "_type": "List"
+    },
+    "height": {
+      "feature": {
+        "dtype": "float32",
+        "_type": "Value"
+      },
+      "_type": "List"
+    },
+    "angle": {
+      "feature": {
+        "dtype": "float32",
+        "_type": "Value"
+      },
+      "_type": "List"
+    },
+    "opacity": {
+      "feature": {
+        "dtype": "float32",
+        "_type": "Value"
+      },
+      "_type": "List"
+    },
+    "color": {
+      "feature": {
+        "feature": {
+          "dtype": "string",
+          "_type": "Value"
+        },
+        "_type": "List"
+      },
+      "_type": "List"
+    },
+    "image": {
+      "feature": {
+        "_type": "Image"
+      },
+      "_type": "List"
+    },
+    "text": {
+      "feature": {
+        "dtype": "string",
+        "_type": "Value"
+      },
+      "_type": "List"
+    },
+    "font": {
+      "feature": {
+        "names": [
+          "",
+          "Montserrat",
+          "Bebas Neue",
+          "Raleway",
+          "Josefin Sans",
+          "Cantarell",
+          "Playfair Display",
+          "Oswald",
+          "Blogger Sans",
+          "Abril Fatface",
+          "Prompt",
+          "Comfortaa",
+          "Rubik",
+          "Open Sans",
+          "Roboto",
+          "Libre Baskerville",
+          "Quicksand",
+          "Dosis",
+          "Podkova",
+          "Lato",
+          "Cormorant Infant",
+          "Amatic Sc",
+          "Fjalla One",
+          "Playlist Script",
+          "Arapey",
+          "Baloo Tamma",
+          "Graduate",
+          "Titillium Web",
+          "Kreon",
+          "Nunito",
+          "Rammetto One",
+          "Anton",
+          "Poiret One",
+          "Alfa Slab One",
+          "Play",
+          "Righteous",
+          "Space Mono",
+          "Frank Ruhl Libre",
+          "Yanone Kaffeesatz",
+          "Pacifico",
+          "Bangers",
+          "Yellowtail",
+          "Droid Serif",
+          "Merriweather",
+          "Racing Sans One",
+          "Miriam Libre",
+          "Crete Round",
+          "Rubik One",
+          "Bungee",
+          "Sansita One",
+          "Economica",
+          "Patua One",
+          "Caveat",
+          "Philosopher",
+          "Limelight",
+          "Breathe",
+          "Rokkitt",
+          "Russo One",
+          "Tinos",
+          "Josefin Slab",
+          "Oleo Script",
+          "Arima Madurai",
+          "Noticia Text",
+          "Kalam",
+          "Old Standard Tt",
+          "Playball",
+          "Bad Script",
+          "Six Caps",
+          "Patrick Hand",
+          "Orbitron",
+          "Contrail One",
+          "Selima Script",
+          "El Messiri",
+          "Bubbler One",
+          "Gravitas One",
+          "Italiana",
+          "Pompiere",
+          "Lemon Tuesday",
+          "Vast Shadow",
+          "Sunday",
+          "Cookie",
+          "Exo 2",
+          "Barrio",
+          "Brusher Free Font",
+          "Radley",
+          "Mrs Sheppards",
+          "Grand Hotel",
+          "Great Vibes",
+          "Maven Pro",
+          "Knewave",
+          "Damion",
+          "Tulpen One",
+          "Parisienne",
+          "Superclarendon",
+          "Nixie One",
+          "Permanent Marker",
+          "Medula One",
+          "Oxygen",
+          "Vollkorn",
+          "Cabin Sketch",
+          "Yeseva One",
+          "Montserrat Alternates",
+          "Satisfy",
+          "Sacramento",
+          "Carter One",
+          "Glass Antiqua",
+          "Mr Dafoe",
+          "Lauren",
+          "Oranienbaum",
+          "Scope One",
+          "Mr De Haviland",
+          "Pirou",
+          "Rise",
+          "Sensei",
+          "Yesteryear",
+          "Delius",
+          "Copse",
+          "Sue Ellen Francisco",
+          "Monda",
+          "Pattaya",
+          "Dancing Script",
+          "Reem Kufi",
+          "Playlist",
+          "Kaushan Script",
+          "Beacon",
+          "Reenie Beanie",
+          "Overlock",
+          "Mrs Saint Delafield",
+          "Open Sans Condensed",
+          "Covered By Your Grace",
+          "Varela Round",
+          "Allura",
+          "Buda",
+          "Brusher",
+          "Nothing You Could Do",
+          "Fredericka The Great",
+          "Arkana",
+          "Rochester",
+          "Port Lligat Slab",
+          "Arimo",
+          "Dawning Of A New Day",
+          "Aldrich",
+          "Mikodacs",
+          "Neucha",
+          "Heebo",
+          "Source Serif Pro",
+          "Shadows Into Two",
+          "Armata",
+          "Cutive Mono",
+          "Merienda One",
+          "Rissatypeface",
+          "Stalemate",
+          "Assistant",
+          "Pathway Gothic One",
+          "Breathe Press",
+          "Suez One",
+          "Berkshire Swash",
+          "Rakkas",
+          "Pinyon Script",
+          "Pt Sans",
+          "Delius Swash Caps",
+          "Offside",
+          "Clicker Script",
+          "Mate",
+          "Kurale",
+          "Rye",
+          "Julius Sans One",
+          "Lalezar",
+          "Quattrocento",
+          "Vt323",
+          "Bentham",
+          "Finger Paint",
+          "La Belle Aurore",
+          "Press Start 2P",
+          "Junge",
+          "Iceberg",
+          "Inconsolata",
+          "Kelly Slab",
+          "Handlee",
+          "Rosario",
+          "Gaegu",
+          "Homemade Apple",
+          "Londrina Shadow",
+          "Meddon",
+          "Gluk Foglihtenno06",
+          "Elsie Swash Caps",
+          "Share Tech Mono",
+          "Black Ops One",
+          "Fauna One",
+          "Alice",
+          "Arizonia",
+          "Text Me One",
+          "Nova Square",
+          "Bungee Shade",
+          "Just Me Again Down Here",
+          "Jacques Francois Shadow",
+          "Cousine",
+          "Forum",
+          "Architects Daughter",
+          "Cedarville Cursive",
+          "Elsie",
+          "Sirin Stencil",
+          "Vampiro One",
+          "Im Fell Dw Pica Sc",
+          "Dorsa",
+          "Marcellus Sc",
+          "Kumar One",
+          "Allerta Stencil",
+          "Courgette",
+          "Rationale",
+          "Stint Ultra Expanded",
+          "Happy Monkey",
+          "Rock Salt",
+          "Faster One",
+          "Bellefair",
+          "Wire One",
+          "Geo",
+          "Farsan",
+          "Chathura",
+          "Euphoria Script",
+          "Zeyada",
+          "Jura",
+          "Loved By The King",
+          "League Script",
+          "Give You Glory",
+          "Znikomitno24",
+          "Alegreya Sans",
+          "Kristi",
+          "Knewave Outline",
+          "Pangolin",
+          "Okolaks",
+          "Seymour One",
+          "Didact Gothic",
+          "Kavivanar",
+          "Underdog",
+          "Alef",
+          "Italianno",
+          "Londrina Sketch",
+          "Katibeh",
+          "Caesar Dressing",
+          "Lovers Quarrel",
+          "Iceland",
+          "Secular One",
+          "Waiting For The Sunrise",
+          "David Libre",
+          "Marck Script",
+          "Kumar One Outline",
+          "Znikomit",
+          "Monsieur La Doulaise",
+          "Gruppo",
+          "Monofett",
+          "Gfs Didot",
+          "Petit Formal Script",
+          "Dukomdesign Constantine",
+          "Eb Garamond",
+          "Ewert",
+          "Bilbo",
+          "Raleway Dots",
+          "Gabriela",
+          "Ruslan Display"
+        ],
+        "_type": "ClassLabel"
+      },
+      "_type": "List"
+    },
+    "font_size": {
+      "feature": {
+        "dtype": "float32",
+        "_type": "Value"
+      },
+      "_type": "List"
+    },
+    "font_bold": {
+      "feature": {
+        "feature": {
+          "dtype": "bool",
+          "_type": "Value"
+        },
+        "_type": "List"
+      },
+      "_type": "List"
+    },
+    "font_italic": {
+      "feature": {
+        "feature": {
+          "dtype": "bool",
+          "_type": "Value"
+        },
+        "_type": "List"
+      },
+      "_type": "List"
+    },
+    "text_line": {
+      "feature": {
+        "feature": {
+          "dtype": "int64",
+          "_type": "Value"
+        },
+        "_type": "List"
+      },
+      "_type": "List"
+    },
+    "text_color": {
+      "feature": {
+        "feature": {
+          "dtype": "string",
+          "_type": "Value"
+        },
+        "_type": "List"
+      },
+      "_type": "List"
+    },
+    "text_align": {
+      "feature": {
+        "names": [
+          "",
+          "left",
+          "center",
+          "right"
+        ],
+        "_type": "ClassLabel"
+      },
+      "_type": "List"
+    },
+    "capitalize": {
+      "feature": {
+        "dtype": "bool",
+        "_type": "Value"
+      },
+      "_type": "List"
+    },
+    "line_height": {
+      "feature": {
+        "dtype": "float32",
+        "_type": "Value"
+      },
+      "_type": "List"
+    },
+    "letter_spacing": {
+      "feature": {
+        "dtype": "float32",
+        "_type": "Value"
+      },
+      "_type": "List"
+    },
+    "cluster_index": {
+      "dtype": "int64",
+      "_type": "Value"
+    }
+  },
+  "homepage": "",
+  "license": "",
+  "size_in_bytes": 16004323858,
+  "splits": {
+    "train": {
+      "name": "train",
+      "num_bytes": 6700668370,
+      "num_examples": 19372,
+      "shard_lengths": [
+        1484,
+        1484,
+        1484,
+        1484,
+        1484,
+        1484,
+        1484,
+        1484,
+        1484,
+        1484,
+        1483,
+        1483,
+        1483,
+        83
+      ],
+      "dataset_name": "crello"
+    },
+    "validation": {
+      "name": "validation",
+      "num_bytes": 629053531,
+      "num_examples": 1823,
+      "shard_lengths": [
+        1512,
+        311
+      ],
+      "dataset_name": "crello"
+    },
+    "test": {
+      "name": "test",
+      "num_bytes": 722742613,
+      "num_examples": 2107,
+      "shard_lengths": [
+        1554,
+        553
+      ],
+      "dataset_name": "crello"
+    }
+  },
+  "version": {
+    "version_str": "0.0.0",
+    "major": 0,
+    "minor": 0,
+    "patch": 0
+  }
+}
