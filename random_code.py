@@ -100,3 +100,20 @@ print(result)
 
 
 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
+
+
+from huggingface_hub import snapshot_download
+
+# Example: clone a dataset or model
+repo_id = "deepseek-ai/DeepSeek-OCR"   # Replace with your repo
+local_dir = "./deepseek_clone"         # Local folder to store it
+
+snapshot_download(
+    repo_id=repo_id,
+    repo_type="model",                 # or "dataset"
+    local_dir=local_dir,
+    ignore_patterns=["*.md", "*.txt"], # optional, skip files
+)
+
+print(f"✅ Repo cloned to: {local_dir}")
+
