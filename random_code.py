@@ -94,3 +94,9 @@ def ocr_page_with_nanonets_s(image_path, model, processor, max_new_tokens=4096):
 image_path = "/path/to/your/document.jpg"
 result = ocr_page_with_nanonets_s(image_path, model, processor, max_new_tokens=15000)
 print(result)
+
+
+
+
+
+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
