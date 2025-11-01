@@ -1,3 +1,12 @@
+# torch==2.6.0
+# transformers==4.46.3
+# tokenizers==0.20.3
+# einops
+# addict 
+# easydict
+# pip install flash-attn==2.7.3 --no-build-isolation
+
+
 from transformers import AutoModel, AutoTokenizer
 import torch
 import os
