@@ -24,3 +24,7 @@ output_path = 'your/output/dir'
 
 res = model.infer(tokenizer, prompt=prompt, image_file=image_file, output_path = output_path, base_size = 1024, image_size = 640, crop_mode=True, save_results = True, test_compress = True)
 
+# device = "cuda" if torch.cuda.is_available() else "cpu"
+# dtype = torch.bfloat16 if device == "cuda" else torch.float32
+
+# model = model.eval().to(device, dtype=dtype)
