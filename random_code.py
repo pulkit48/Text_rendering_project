@@ -117,3 +117,5 @@ snapshot_download(
 
 print(f"✅ Repo cloned to: {local_dir}")
 
+
+https://huggingface.co/datasets/Pulkit996/transformers/resolve/main/transformers.zip
