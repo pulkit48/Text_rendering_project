@@ -52,18 +52,24 @@ class UnifiedLayerSystem:
                 # Visibility
                 'enabled': True,
                 
-                # Spatial properties
-                'position': (0, 0),         # (x, y) offset
-                'scale': 1.0,               # Scale factor
-                'rotation': 0.0,            # Degrees
-                'flip_horizontal': False,
-                'flip_vertical': False,
-                
-                # Color properties
-                'color_mode': None,         # 'warmer', 'blue', etc.
-                'color_intensity': 0.5,
-                'saturation_boost': None,
-                'brightness_adjust': None,
+                # Duplication
+                'count': 1,                 # Number of copies (1 = original only)
+                'instances': [              # Properties for each copy
+                    {
+                        # Spatial properties
+                        'position': (0, 0),         # (x, y) offset
+                        'scale': 1.0,               # Scale factor
+                        'rotation': 0.0,            # Degrees
+                        'flip_horizontal': False,
+                        'flip_vertical': False,
+                        
+                        # Color properties
+                        'color_mode': None,         # 'warmer', 'blue', etc.
+                        'color_intensity': 0.5,
+                        'saturation_boost': None,
+                        'brightness_adjust': None,
+                    }
+                ]
             })
         
         # Get canvas size
@@ -99,37 +105,114 @@ class UnifiedLayerSystem:
             print(f"✓ Layer {index} {status}")
     
     # ========================================================================
+    # Duplication / Count Management
+    # ========================================================================
+    
+    def set_count(self, index: int, count: int):
+        """
+        Set how many copies of this layer to render.
+        Creates actual new layers in the list with same file.
+        
+        Args:
+            index: Layer index
+            count: Number of copies (1 = original only, 2 = original + 1 duplicate, etc.)
+        """
+        if not 0 <= index < len(self.layers):
+            print(f"✗ Invalid layer index: {index}")
+            return
+        
+        if count < 1:
+            print(f"✗ Count must be at least 1")
+            return
+        
+        base_layer = self.layers[index]
+        current_instances = [i for i, l in enumerate(self.layers) 
+                            if l['file'] == base_layer['file']]
+        current_count = len(current_instances)
+        
+        if count > current_count:
+            # Add more layers (duplicates)
+            for _ in range(count - current_count):
+                new_layer = {
+                    'index': len(self.layers),
+                    'file': base_layer['file'],
+                    'type': base_layer['type'],
+                    'enabled': True,
+                    'count': 1,
+                    'instances': [
+                        {
+                            'position': (0, 0),
+                            'scale': 1.0,
+                            'rotation': 0.0,
+                            'flip_horizontal': False,
+                            'flip_vertical': False,
+                            'color_mode': None,
+                            'color_intensity': 0.5,
+                            'saturation_boost': None,
+                            'brightness_adjust': None,
+                        }
+                    ]
+                }
+                self.layers.append(new_layer)
+                print(f"✓ Created duplicate layer {new_layer['index']} from layer {index}")
+        
+        elif count < current_count:
+            # Remove duplicates (keep first 'count' instances)
+            instances_to_keep = current_instances[:count]
+            instances_to_remove = current_instances[count:]
+            
+            # Remove from layers list
+            self.layers = [l for i, l in enumerate(self.layers) 
+                          if i not in instances_to_remove]
+            
+            # Reindex
+            for i, layer in enumerate(self.layers):
+                layer['index'] = i
+            
+            print(f"✓ Removed {len(instances_to_remove)} duplicate(s)")
+        
+        print(f"✓ Layer {index} now has {count} instance(s) (total layers: {len(self.layers)})")
+    
+    def get_duplicates_of(self, index: int) -> list:
+        """Get indices of all layers using the same file as this layer."""
+        if not 0 <= index < len(self.layers):
+            return []
+        
+        base_file = self.layers[index]['file']
+        return [i for i, l in enumerate(self.layers) if l['file'] == base_file]
+    
+    # ========================================================================
     # Spatial Properties
     # ========================================================================
     
     def set_position(self, index: int, x: int, y: int):
         """Set layer position."""
         if 0 <= index < len(self.layers):
-            self.layers[index]['position'] = (x, y)
+            self.layers[index]['instances'][0]['position'] = (x, y)
             print(f"✓ Layer {index} position: ({x}, {y})")
     
     def set_scale(self, index: int, scale: float):
         """Set layer scale."""
         if 0 <= index < len(self.layers):
-            self.layers[index]['scale'] = scale
+            self.layers[index]['instances'][0]['scale'] = scale
             print(f"✓ Layer {index} scale: {scale}x")
     
     def set_rotation(self, index: int, degrees: float):
         """Set layer rotation."""
         if 0 <= index < len(self.layers):
-            self.layers[index]['rotation'] = degrees
+            self.layers[index]['instances'][0]['rotation'] = degrees
             print(f"✓ Layer {index} rotation: {degrees}°")
     
     def set_flip_horizontal(self, index: int, flip: bool):
         """Set horizontal flip."""
         if 0 <= index < len(self.layers):
-            self.layers[index]['flip_horizontal'] = flip
+            self.layers[index]['instances'][0]['flip_horizontal'] = flip
             print(f"✓ Layer {index} flip_h: {flip}")
     
     def set_flip_vertical(self, index: int, flip: bool):
         """Set vertical flip."""
         if 0 <= index < len(self.layers):
-            self.layers[index]['flip_vertical'] = flip
+            self.layers[index]['instances'][0]['flip_vertical'] = flip
             print(f"✓ Layer {index} flip_v: {flip}")
     
     # ========================================================================
@@ -141,10 +224,11 @@ class UnifiedLayerSystem:
                   brightness_adjust: Optional[float] = None):
         """Set color properties."""
         if 0 <= index < len(self.layers):
-            self.layers[index]['color_mode'] = mode
-            self.layers[index]['color_intensity'] = intensity
-            self.layers[index]['saturation_boost'] = saturation_boost
-            self.layers[index]['brightness_adjust'] = brightness_adjust
+            instance = self.layers[index]['instances'][0]
+            instance['color_mode'] = mode
+            instance['color_intensity'] = intensity
+            instance['saturation_boost'] = saturation_boost
+            instance['brightness_adjust'] = brightness_adjust
             print(f"✓ Layer {index} color: {mode} (intensity={intensity})")
     
     # ========================================================================
@@ -156,15 +240,20 @@ class UnifiedLayerSystem:
         if 0 <= index < len(self.layers):
             self.layers[index].update({
                 'enabled': True,
-                'position': (0, 0),
-                'scale': 1.0,
-                'rotation': 0.0,
-                'flip_horizontal': False,
-                'flip_vertical': False,
-                'color_mode': None,
-                'color_intensity': 0.5,
-                'saturation_boost': None,
-                'brightness_adjust': None,
+                'count': 1,
+                'instances': [
+                    {
+                        'position': (0, 0),
+                        'scale': 1.0,
+                        'rotation': 0.0,
+                        'flip_horizontal': False,
+                        'flip_vertical': False,
+                        'color_mode': None,
+                        'color_intensity': 0.5,
+                        'saturation_boost': None,
+                        'brightness_adjust': None,
+                    }
+                ]
             })
             print(f"✓ Layer {index} reset to defaults")
     
@@ -181,65 +270,83 @@ class UnifiedLayerSystem:
         """Show all layer properties."""
         print(f"\nLayer Properties for {self.image_id}")
         print("=" * 80)
+        
+        # Group by file to show duplicates
+        seen_files = {}
+        for layer in self.layers:
+            file_key = str(layer['file'])
+            if file_key not in seen_files:
+                seen_files[file_key] = []
+            seen_files[file_key].append(layer)
+        
         for layer in self.layers:
             i = layer['index']
             status = "✓" if layer['enabled'] else "✗"
             layer_type = layer['type'].capitalize()
             
-            # Build property list
+            # Check if this is a duplicate
+            file_key = str(layer['file'])
+            duplicates = seen_files[file_key]
+            is_duplicate = len(duplicates) > 1 and layer != duplicates[0]
+            
+            instance = layer['instances'][0]
             props = []
             
             # Spatial
-            if layer['position'] != (0, 0):
-                props.append(f"pos=({layer['position'][0]:+d},{layer['position'][1]:+d})")
-            if layer['scale'] != 1.0:
-                props.append(f"scale={layer['scale']:.2f}x")
-            if layer['rotation'] != 0:
-                props.append(f"rot={layer['rotation']:.1f}°")
-            if layer['flip_horizontal']:
+            if instance['position'] != (0, 0):
+                props.append(f"pos=({instance['position'][0]:+d},{instance['position'][1]:+d})")
+            if instance['scale'] != 1.0:
+                props.append(f"scale={instance['scale']:.2f}x")
+            if instance['rotation'] != 0:
+                props.append(f"rot={instance['rotation']:.1f}°")
+            if instance['flip_horizontal']:
                 props.append("flip_h")
-            if layer['flip_vertical']:
+            if instance['flip_vertical']:
                 props.append("flip_v")
             
             # Color
-            if layer['color_mode']:
-                color_str = f"color={layer['color_mode']}"
-                if layer['saturation_boost']:
+            if instance['color_mode']:
+                color_str = f"color={instance['color_mode']}"
+                if instance['saturation_boost']:
                     color_str += f"+sat"
-                if layer['brightness_adjust']:
+                if instance['brightness_adjust']:
                     color_str += f"+bright"
                 props.append(color_str)
             
             props_str = ", ".join(props) if props else "default"
-            print(f"{status} Layer {i:2d} ({layer_type:10s}): {props_str}")
+            
+            # Mark duplicates
+            duplicate_marker = " [DUPLICATE]" if is_duplicate else ""
+            
+            print(f"{status} Layer {i:2d} ({layer_type:10s}): {props_str}{duplicate_marker}")
         print("=" * 80)
     
     # ========================================================================
     # Apply Transformations (Helper Functions)
     # ========================================================================
     
-    def _apply_spatial_transforms(self, img: Image.Image, layer: Dict) -> Image.Image:
+    def _apply_spatial_transforms(self, img: Image.Image, instance: Dict) -> Image.Image:
         """Apply spatial transformations to an image."""
         # Convert to RGBA for transformations
         if img.mode != 'RGBA':
             img = img.convert('RGBA')
         
         # 1. Flip
-        if layer['flip_horizontal']:
+        if instance['flip_horizontal']:
             img = img.transpose(Image.FLIP_LEFT_RIGHT)
-        if layer['flip_vertical']:
+        if instance['flip_vertical']:
             img = img.transpose(Image.FLIP_TOP_BOTTOM)
         
         # 2. Scale
-        if layer['scale'] != 1.0:
-            new_w = int(img.width * layer['scale'])
-            new_h = int(img.height * layer['scale'])
+        if instance['scale'] != 1.0:
+            new_w = int(img.width * instance['scale'])
+            new_h = int(img.height * instance['scale'])
             img = img.resize((new_w, new_h), Image.LANCZOS)
         
         # 3. Rotate
-        if layer['rotation'] != 0:
+        if instance['rotation'] != 0:
             img = img.rotate(
-                layer['rotation'],
+                instance['rotation'],
                 resample=Image.BICUBIC,
                 expand=True,
                 fillcolor=(0, 0, 0, 0)
@@ -247,9 +354,9 @@ class UnifiedLayerSystem:
         
         return img
     
-    def _apply_color_transform(self, img: Image.Image, layer: Dict) -> Image.Image:
+    def _apply_color_transform(self, img: Image.Image, instance: Dict) -> Image.Image:
         """Apply color transformations to an image."""
-        if not layer['color_mode']:
+        if not instance['color_mode']:
             return img  # No color transform
         
         import numpy as np
@@ -263,8 +370,8 @@ class UnifiedLayerSystem:
             rgb = img_array
             alpha = None
         
-        mode = layer['color_mode']
-        intensity = layer['color_intensity']
+        mode = instance['color_mode']
+        intensity = instance['color_intensity']
         
         # Simple color transformations
         if mode == 'grayscale':
@@ -305,6 +412,7 @@ class UnifiedLayerSystem:
         
         This is the SINGLE render function that handles everything:
         - Visibility (enabled/disabled)
+        - Count (multiple instances of same layer)
         - Spatial transforms (position, scale, rotation, flip)
         - Color transforms (color mode, saturation, brightness)
         
@@ -320,27 +428,29 @@ class UnifiedLayerSystem:
             if not layer['enabled']:
                 continue
             
-            # Load layer image
-            img = Image.open(layer['file']).convert('RGBA')
-            
-            # Store original size for position calculation
-            original_size = img.size
-            
-            # Apply spatial transformations
-            img = self._apply_spatial_transforms(img, layer)
-            
-            # Apply color transformations
-            img = self._apply_color_transform(img, layer)
-            
-            # Calculate position (accounting for size changes)
-            x_offset, y_offset = layer['position']
-            size_diff_x = (img.width - original_size[0]) // 2
-            size_diff_y = (img.height - original_size[1]) // 2
-            paste_x = x_offset - size_diff_x
-            paste_y = y_offset - size_diff_y
-            
-            # Composite onto canvas
-            result.paste(img, (paste_x, paste_y), img)
+            # Process each instance of this layer
+            for instance in layer['instances']:
+                # Load layer image (fresh copy for each instance)
+                img = Image.open(layer['file']).convert('RGBA')
+                
+                # Store original size for position calculation
+                original_size = img.size
+                
+                # Apply spatial transformations
+                img = self._apply_spatial_transforms(img, instance)
+                
+                # Apply color transformations
+                img = self._apply_color_transform(img, instance)
+                
+                # Calculate position (accounting for size changes)
+                x_offset, y_offset = instance['position']
+                size_diff_x = (img.width - original_size[0]) // 2
+                size_diff_y = (img.height - original_size[1]) // 2
+                paste_x = x_offset - size_diff_x
+                paste_y = y_offset - size_diff_y
+                
+                # Composite onto canvas
+                result.paste(img, (paste_x, paste_y), img)
         
         # Convert to RGB for final output
         rgb_result = Image.new('RGB', result.size, (255, 255, 255))
@@ -360,13 +470,16 @@ class UnifiedLayerSystem:
         
         if num_layers == 0:
             axes = [axes]
+        elif num_layers == 1:
+            axes = [axes[0], axes[1]]
         
         # Show individual layers
         for i, layer in enumerate(self.layers):
             # Load and transform
             img = Image.open(layer['file']).convert('RGBA')
-            img = self._apply_spatial_transforms(img, layer)
-            img = self._apply_color_transform(img, layer)
+            instance = layer['instances'][0]
+            img = self._apply_spatial_transforms(img, instance)
+            img = self._apply_color_transform(img, instance)
             
             axes[i].imshow(img)
             
@@ -376,14 +489,14 @@ class UnifiedLayerSystem:
             
             # Add property hints
             hints = []
-            if layer['position'] != (0, 0):
+            if instance['position'] != (0, 0):
                 hints.append(f"pos")
-            if layer['scale'] != 1.0:
-                hints.append(f"{layer['scale']:.1f}x")
-            if layer['rotation'] != 0:
-                hints.append(f"{layer['rotation']:.0f}°")
-            if layer['color_mode']:
-                hints.append(f"{layer['color_mode']}")
+            if instance['scale'] != 1.0:
+                hints.append(f"{instance['scale']:.1f}x")
+            if instance['rotation'] != 0:
+                hints.append(f"{instance['rotation']:.0f}°")
+            if instance['color_mode']:
+                hints.append(f"{instance['color_mode']}")
             
             if hints:
                 title += "\n" + ", ".join(hints)
@@ -421,7 +534,7 @@ class UnifiedLayerSystem:
 
 if __name__ == "__main__":
     
-    print("Unified Layer System - Demo")
+    print("Unified Layer System with Duplication - Demo")
     print("=" * 70)
     
     # Create system
@@ -430,48 +543,69 @@ if __name__ == "__main__":
         layer_dir="/content/mulan_output"
     )
     
-    # Example 1: Modify different properties
-    print("\n--- Setting Properties ---")
+    # Example 1: Duplicate a layer
+    print("\n--- Example 1: Duplicate Layer ---")
     
-    # Layer 1: Position + Scale
-    system.set_position(1, x=50, y=-30)
-    system.set_scale(1, 1.3)
+    # Duplicate layer 1 (creates 2 total)
+    system.set_count(1, 2)
     
-    # Layer 2: Color + Rotation
-    system.set_color(2, 'warmer', intensity=0.5)
-    system.set_rotation(2, 15)
+    # Now we have layer 1 and a new duplicate layer
+    # Get the duplicate indices
+    duplicates = system.get_duplicates_of(1)
+    print(f"Layer 1 duplicates at indices: {duplicates}")
     
-    # Layer 3: Flip
-    system.set_flip_horizontal(3, True)
+    # Modify them independently (they're just different layers now!)
+    system.set_position(duplicates[0], x=50, y=-30)   # Original
+    system.set_position(duplicates[1], x=-50, y=30)   # Duplicate
     
-    # Show status
+    # Different colors
+    system.set_color(duplicates[0], 'blue', intensity=0.5)
+    system.set_color(duplicates[1], 'red', intensity=0.5)
+    
     system.show_status()
     
-    # Render (applies ALL properties)
-    print("\n--- Rendering ---")
-    result = system.render()
-    result.save("unified_demo.png")
-    print("✓ Saved: unified_demo.png")
+    result1 = system.render()
+    result1.save("duplicate_demo.png")
+    print("✓ Saved: duplicate_demo.png")
     
-    # Example 2: Combine everything
-    print("\n--- Complex Example ---")
+    # Example 2: Triple layer
+    print("\n--- Example 2: Triple Layer ---")
     system.reset_all()
     
-    # Layer 1: Everything!
-    system.set_position(1, x=40, y=-20)
-    system.set_scale(1, 1.2)
-    system.set_rotation(1, 10)
-    system.set_color(1, 'cooler', intensity=0.4)
+    # Create 3 copies of layer 1
+    system.set_count(1, 3)
+    duplicates = system.get_duplicates_of(1)
+    
+    # Position them in a row
+    system.set_position(duplicates[0], x=-100, y=0)
+    system.set_position(duplicates[1], x=0, y=0)
+    system.set_position(duplicates[2], x=100, y=0)
+    
+    # Different sizes
+    system.set_scale(duplicates[0], 0.8)
+    system.set_scale(duplicates[1], 1.0)
+    system.set_scale(duplicates[2], 1.2)
     
     system.show_status()
     
     result2 = system.render()
-    result2.save("unified_complex.png")
-    print("✓ Saved: unified_complex.png")
+    result2.save("triple_demo.png")
+    print("✓ Saved: triple_demo.png")
     
-    # Visualize
-    print("\n--- Visualization ---")
-    system.visualize(save_path="unified_visualization.png")
+    # Example 3: Simple usage without duplication
+    print("\n--- Example 3: Regular Usage ---")
+    system.reset_all()
+    
+    # Just use layers normally
+    system.set_position(1, x=40, y=-20)
+    system.set_scale(1, 1.2)
+    system.set_color(1, 'cooler', intensity=0.4)
+    
+    system.show_status()
+    
+    result3 = system.render()
+    result3.save("simple_demo.png")
+    print("✓ Saved: simple_demo.png")
     
     print("\n✓ All examples complete!")
-    print("One render() function applies all properties!")
+    print("Duplicates are just new layers - use them like any other layer!")
