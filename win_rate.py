@@ -47,7 +47,7 @@ class LayerDataset:
 
         # Load layer files
         self.layer_files = sorted(
-            self.layer_dir.glob(f"{image_id}_layer_*.png")
+            self.layer_dir.glob(f"{image_id}-layer_*.png")
         )
 
         if len(self.layer_files) == 0:
