@@ -196,3 +196,233 @@ class LayerDataset:
                     print(f"  {key}: {value}")
 
         print("=" * 80)
+class LayerRenderer:
+    def __init__(self, dataset):
+        self.dataset = dataset
+
+    # ==========================================
+    def _apply_all_properties(self, img, instance):
+
+        # Flip
+        if instance['flip_horizontal']:
+            img = img.transpose(Image.FLIP_LEFT_RIGHT)
+
+        if instance['flip_vertical']:
+            img = img.transpose(Image.FLIP_TOP_BOTTOM)
+
+        # Scale
+        if instance['scale'] != 1.0:
+            new_w = int(img.width * instance['scale'])
+            new_h = int(img.height * instance['scale'])
+            img = img.resize((new_w, new_h), Image.LANCZOS)
+
+        # Rotation
+        if instance['rotation'] != 0:
+            img = img.rotate(
+                instance['rotation'],
+                resample=Image.BICUBIC,
+                expand=True,
+                fillcolor=(0, 0, 0, 0)
+            )
+
+        # Color transform
+        if instance['color_mode']:
+            img_array = np.array(img)
+
+            rgb = img_array[:, :, :3]
+            alpha = img_array[:, :, 3]
+
+            mode = instance['color_mode']
+            intensity = instance['color_intensity']
+
+            if mode == "grayscale":
+                gray = (
+                    0.299 * rgb[:, :, 0] +
+                    0.587 * rgb[:, :, 1] +
+                    0.114 * rgb[:, :, 2]
+                )
+
+                rgb_new = np.stack([gray, gray, gray], axis=2)
+
+                rgb = (
+                    rgb * (1 - intensity) +
+                    rgb_new * intensity
+                ).astype(np.uint8)
+
+            elif mode == "warmer":
+                shift = np.array([30, 10, -20], dtype=np.float32)
+                rgb = np.clip(
+                    rgb.astype(np.float32) + shift * intensity * 2,
+                    0, 255
+                ).astype(np.uint8)
+
+            elif mode == "cooler":
+                shift = np.array([-20, 0, 30], dtype=np.float32)
+                rgb = np.clip(
+                    rgb.astype(np.float32) + shift * intensity * 2,
+                    0, 255
+                ).astype(np.uint8)
+
+            img = Image.fromarray(
+                np.dstack([rgb, alpha]),
+                "RGBA"
+            )
+
+        return img
+
+    # ==========================================
+    def render(self):
+        result = Image.new(
+            'RGBA',
+            self.dataset.canvas_size,
+            (255, 255, 255, 0)
+        )
+
+        for layer in self.dataset.layers:
+
+            if not layer['enabled']:
+                continue
+
+            instance = layer['instances'][0]
+
+            # Background
+            if layer['type'] == 'background':
+                img = Image.open(layer['file']).convert('RGBA')
+                img = self._apply_all_properties(img, instance)
+                result.paste(img, (0, 0), img)
+                continue
+
+            if instance['image'] is None:
+                continue
+
+            img = instance['image']
+            img = self._apply_all_properties(img, instance)
+
+            x1, y1, _, _ = instance['bbox']
+            dx, dy = instance['position']
+
+            result.paste(img, (x1 + dx, y1 + dy), img)
+
+        # Convert to RGB
+        rgb_result = Image.new('RGB', result.size, (255, 255, 255))
+        rgb_result.paste(result, (0, 0), result)
+
+        return rgb_result
+
+    # ==========================================
+    def visualize(self, save_path=None):
+        layers = self.dataset.layers
+        num_layers = len(layers)
+
+        fig, axes = plt.subplots(
+            1,
+            num_layers + 1,
+            figsize=(4 * (num_layers + 1), 4)
+        )
+
+        if num_layers == 1:
+            axes = [axes[0], axes[1]]
+
+        for i, layer in enumerate(layers):
+            instance = layer['instances'][0]
+
+            if layer['type'] == 'background':
+                img = Image.open(layer['file']).convert('RGBA')
+            else:
+                if instance['image'] is None:
+                    axes[i].set_title(f"L{i}\n<empty>")
+                    axes[i].axis('off')
+                    continue
+                img = instance['image']
+
+            img = self._apply_all_properties(img, instance)
+
+            axes[i].imshow(img)
+
+            status = "✓" if layer['enabled'] else "✗"
+            title = f"{status} L{i}"
+            axes[i].set_title(title)
+            axes[i].axis('off')
+
+        result = self.render()
+
+        axes[-1].imshow(result)
+        axes[-1].set_title("Final Result", fontweight='bold')
+        axes[-1].axis('off')
+
+        plt.tight_layout()
+
+        if save_path:
+            plt.savefig(save_path, dpi=150, bbox_inches='tight')
+            print(f"✓ Saved: {save_path}")
+
+        plt.show()
+
+class LayerEditor:
+    def __init__(self, dataset):
+        self.dataset = dataset
+
+    # ==========================================
+    def set_enabled(self, index: int, enabled: bool):
+        layers = self.dataset.layers
+
+        if 0 <= index < len(layers):
+            layers[index]['enabled'] = enabled
+            print(f"✓ Layer {index} {'enabled' if enabled else 'disabled'}")
+
+    # ==========================================
+    def set_position(self, index: int, x: int, y: int):
+        layers = self.dataset.layers
+
+        if 0 <= index < len(layers):
+            layers[index]['instances'][0]['position'] = (x, y)
+            print(f"✓ Layer {index} position: ({x}, {y})")
+
+    # ==========================================
+    def set_scale(self, index: int, scale: float):
+        layers = self.dataset.layers
+
+        if 0 <= index < len(layers):
+            layers[index]['instances'][0]['scale'] = scale
+            print(f"✓ Layer {index} scale: {scale}x")
+
+    # ==========================================
+    def set_rotation(self, index: int, degrees: float):
+        layers = self.dataset.layers
+
+        if 0 <= index < len(layers):
+            layers[index]['instances'][0]['rotation'] = degrees
+            print(f"✓ Layer {index} rotation: {degrees}°")
+
+    # ==========================================
+    def set_flip_horizontal(self, index: int, flip: bool):
+        layers = self.dataset.layers
+
+        if 0 <= index < len(layers):
+            layers[index]['instances'][0]['flip_horizontal'] = flip
+            print(f"✓ Layer {index} flip_h: {flip}")
+
+    def set_flip_vertical(self, index: int, flip: bool):
+        layers = self.dataset.layers
+
+        if 0 <= index < len(layers):
+            layers[index]['instances'][0]['flip_vertical'] = flip
+            print(f"✓ Layer {index} flip_v: {flip}")
+
+    # ==========================================
+    def set_color(self, index: int, mode: str,
+                  intensity: float = 0.5,
+                  saturation_boost=None,
+                  brightness_adjust=None):
+
+        layers = self.dataset.layers
+
+        if 0 <= index < len(layers):
+            inst = layers[index]['instances'][0]
+
+            inst['color_mode'] = mode
+            inst['color_intensity'] = intensity
+            inst['saturation_boost'] = saturation_boost
+            inst['brightness_adjust'] = brightness_adjust
+
+            print(f"✓ Layer {index} color: {mode}")
