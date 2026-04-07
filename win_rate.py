@@ -196,6 +196,7 @@ class LayerDataset:
                     print(f"  {key}: {value}")
 
         print("=" * 80)
+
 class LayerRenderer:
     def __init__(self, dataset):
         self.dataset = dataset
@@ -225,7 +226,7 @@ class LayerRenderer:
                 fillcolor=(0, 0, 0, 0)
             )
 
-        # Color transform
+        # Color transforms
         if instance['color_mode']:
             img_array = np.array(img)
 
@@ -241,7 +242,6 @@ class LayerRenderer:
                     0.587 * rgb[:, :, 1] +
                     0.114 * rgb[:, :, 2]
                 )
-
                 rgb_new = np.stack([gray, gray, gray], axis=2)
 
                 rgb = (
@@ -263,10 +263,7 @@ class LayerRenderer:
                     0, 255
                 ).astype(np.uint8)
 
-            img = Image.fromarray(
-                np.dstack([rgb, alpha]),
-                "RGBA"
-            )
+            img = Image.fromarray(np.dstack([rgb, alpha]), "RGBA")
 
         return img
 
@@ -285,7 +282,6 @@ class LayerRenderer:
 
             instance = layer['instances'][0]
 
-            # Background
             if layer['type'] == 'background':
                 img = Image.open(layer['file']).convert('RGBA')
                 img = self._apply_all_properties(img, instance)
@@ -303,7 +299,6 @@ class LayerRenderer:
 
             result.paste(img, (x1 + dx, y1 + dy), img)
 
-        # Convert to RGB
         rgb_result = Image.new('RGB', result.size, (255, 255, 255))
         rgb_result.paste(result, (0, 0), result)
 
@@ -357,72 +352,3 @@ class LayerRenderer:
             print(f"✓ Saved: {save_path}")
 
         plt.show()
-
-class LayerEditor:
-    def __init__(self, dataset):
-        self.dataset = dataset
-
-    # ==========================================
-    def set_enabled(self, index: int, enabled: bool):
-        layers = self.dataset.layers
-
-        if 0 <= index < len(layers):
-            layers[index]['enabled'] = enabled
-            print(f"✓ Layer {index} {'enabled' if enabled else 'disabled'}")
-
-    # ==========================================
-    def set_position(self, index: int, x: int, y: int):
-        layers = self.dataset.layers
-
-        if 0 <= index < len(layers):
-            layers[index]['instances'][0]['position'] = (x, y)
-            print(f"✓ Layer {index} position: ({x}, {y})")
-
-    # ==========================================
-    def set_scale(self, index: int, scale: float):
-        layers = self.dataset.layers
-
-        if 0 <= index < len(layers):
-            layers[index]['instances'][0]['scale'] = scale
-            print(f"✓ Layer {index} scale: {scale}x")
-
-    # ==========================================
-    def set_rotation(self, index: int, degrees: float):
-        layers = self.dataset.layers
-
-        if 0 <= index < len(layers):
-            layers[index]['instances'][0]['rotation'] = degrees
-            print(f"✓ Layer {index} rotation: {degrees}°")
-
-    # ==========================================
-    def set_flip_horizontal(self, index: int, flip: bool):
-        layers = self.dataset.layers
-
-        if 0 <= index < len(layers):
-            layers[index]['instances'][0]['flip_horizontal'] = flip
-            print(f"✓ Layer {index} flip_h: {flip}")
-
-    def set_flip_vertical(self, index: int, flip: bool):
-        layers = self.dataset.layers
-
-        if 0 <= index < len(layers):
-            layers[index]['instances'][0]['flip_vertical'] = flip
-            print(f"✓ Layer {index} flip_v: {flip}")
-
-    # ==========================================
-    def set_color(self, index: int, mode: str,
-                  intensity: float = 0.5,
-                  saturation_boost=None,
-                  brightness_adjust=None):
-
-        layers = self.dataset.layers
-
-        if 0 <= index < len(layers):
-            inst = layers[index]['instances'][0]
-
-            inst['color_mode'] = mode
-            inst['color_intensity'] = intensity
-            inst['saturation_boost'] = saturation_boost
-            inst['brightness_adjust'] = brightness_adjust
-
-            print(f"✓ Layer {index} color: {mode}")
