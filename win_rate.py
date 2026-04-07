@@ -352,3 +352,334 @@ class LayerRenderer:
             print(f"✓ Saved: {save_path}")
 
         plt.show()
+
+class LayerEditor:
+    def __init__(self, dataset):
+        self.dataset = dataset
+
+    # ==========================================
+    # Enable / Disable
+    def set_enabled(self, index: int, enabled: bool):
+        layers = self.dataset.layers
+        if 0 <= index < len(layers):
+            layers[index]['enabled'] = enabled
+            print(f"✓ Layer {index} {'enabled' if enabled else 'disabled'}")
+
+    # ==========================================
+    # Duplication
+    def set_count(self, index: int, count: int):
+        import copy
+        layers = self.dataset.layers
+
+        if not (0 <= index < len(layers)):
+            print(f"✗ Invalid layer index: {index}")
+            return
+
+        base_layer = layers[index]
+        base_file = base_layer['file']
+        base_inst = base_layer['instances'][0]
+
+        current_indices = [
+            i for i, l in enumerate(layers)
+            if l['file'] == base_file
+        ]
+
+        current_count = len(current_indices)
+
+        if count > current_count:
+            for _ in range(count - current_count):
+                new_inst = copy.deepcopy(base_inst)
+
+                new_layer = {
+                    'index': len(layers),
+                    'file': base_file,
+                    'type': base_layer['type'],
+                    'enabled': True,
+                    'count': 1,
+                    'instances': [new_inst]
+                }
+                layers.append(new_layer)
+
+        elif count < current_count:
+            keep = current_indices[:count]
+            layers[:] = [
+                l for i, l in enumerate(layers)
+                if i in keep or l['file'] != base_file
+            ]
+
+            for i, l in enumerate(layers):
+                l['index'] = i
+
+        print(f"✓ Layer {index} now has {count} instances")
+
+    # ==========================================
+    # Spatial transforms
+    def set_position(self, index: int, x: int, y: int):
+        self.dataset.layers[index]['instances'][0]['position'] = (x, y)
+
+    def set_scale(self, index: int, scale: float):
+        self.dataset.layers[index]['instances'][0]['scale'] = scale
+
+    def set_rotation(self, index: int, degrees: float):
+        self.dataset.layers[index]['instances'][0]['rotation'] = degrees
+
+    # ==========================================
+    # Flip
+    def set_flip_horizontal(self, index: int, flip: bool):
+        self.dataset.layers[index]['instances'][0]['flip_horizontal'] = flip
+
+    def set_flip_vertical(self, index: int, flip: bool):
+        self.dataset.layers[index]['instances'][0]['flip_vertical'] = flip
+
+    # ==========================================
+    # Color
+    def set_color(self, index: int, mode: str,
+                  intensity: float = 0.5,
+                  saturation_boost=None,
+                  brightness_adjust=None):
+
+        inst = self.dataset.layers[index]['instances'][0]
+
+        inst['color_mode'] = mode
+        inst['color_intensity'] = intensity
+        inst['saturation_boost'] = saturation_boost
+        inst['brightness_adjust'] = brightness_adjust
+
+    # ==========================================
+    # REMOVE RANDOM PART  (FROM IMAGE)
+    def remove_random_part(self, index: int, visualize=True):
+        import matplotlib.pyplot as plt
+
+        layer = self.dataset.layers[index]
+
+        if layer['instances'][0]['image'] is None:
+            print("✗ No image found")
+            return
+
+        original_img = np.array(layer['instances'][0]['image'], dtype=np.uint8)
+
+        alpha = original_img[:, :, 3] > 0
+        mask = self._generate_structured_mask(alpha)
+
+        edited = original_img.copy()
+        edited[mask] = [0, 0, 0, 0]
+
+        edited_img = Image.fromarray(edited, "RGBA")
+
+        layer['instances'][0]['image'] = edited_img
+
+        print(f"✓ Layer {index} random part removed")
+
+        if visualize:
+            fig, axes = plt.subplots(1, 3, figsize=(12, 4))
+
+            axes[0].imshow(original_img)
+            axes[0].set_title("Original")
+            axes[0].axis('off')
+
+            axes[1].imshow(mask, cmap='gray')
+            axes[1].set_title("Mask")
+            axes[1].axis('off')
+
+            axes[2].imshow(edited_img)
+            axes[2].set_title("Edited")
+            axes[2].axis('off')
+
+            plt.tight_layout()
+            plt.show()
+
+    # ==========================================
+    # EDGE DISTORTION (FROM YOUR IMAGE)
+    def distort_object_edge(self, index: int,
+                            max_shift: int = 3,
+                            probability: float = 0.7,
+                            visualize: bool = False):
+
+        layers = self.dataset.layers
+
+        if not (0 <= index < len(layers)):
+            print("✗ Invalid layer index")
+            return
+
+        layer = layers[index]
+
+        if layer['type'] == 'background':
+            print("✗ Cannot distort background")
+            return
+
+        if layer['instances'][0]['image'] is None:
+            print("✗ No object image")
+            return
+
+        img = np.array(layer['instances'][0]['image'], dtype=np.uint8)
+        H, W, _ = img.shape
+
+        edge_mask = self.dataset.get_edge_mask(index, thickness=2)
+
+        if edge_mask is None:
+            print("✗ No edge mask available")
+            return
+
+        distorted = img.copy()
+
+        ys, xs = np.where(edge_mask)
+
+        for y, x in zip(ys, xs):
+            if random.random() > probability:
+                continue
+
+            dy = random.randint(-max_shift, max_shift)
+            dx = random.randint(-max_shift, max_shift)
+
+            ny = np.clip(y + dy, 0, H - 1)
+            nx = np.clip(x + dx, 0, W - 1)
+
+            distorted[ny, nx] = img[y, x]
+            distorted[y, x] = [0, 0, 0, 0]
+
+        layer['instances'][0]['image'] = Image.fromarray(distorted, "RGBA")
+
+        print(f"✓ Edge distortion applied to layer {index}")
+
+        if visualize:
+            import matplotlib.pyplot as plt
+            fig, axes = plt.subplots(1, 2, figsize=(8, 4))
+
+            axes[0].imshow(img)
+            axes[0].set_title("Before")
+            axes[0].axis('off')
+
+            axes[1].imshow(distorted)
+            axes[1].set_title("After")
+            axes[1].axis('off')
+
+            plt.tight_layout()
+            plt.show()
+
+    # ==========================================
+    # RESET SINGLE LAYER
+    def reset_layer(self, index: int):
+        layers = self.dataset.layers
+
+        if 0 <= index < len(layers):
+            layers[index].update({
+                'enabled': True,
+                'count': 1,
+                'instances': [{
+                    'position': (0, 0),
+                    'scale': 1.0,
+                    'rotation': 0.0,
+                    'flip_horizontal': False,
+                    'flip_vertical': False,
+                    'color_mode': None,
+                    'color_intensity': 0.5,
+                    'saturation_boost': None,
+                    'brightness_adjust': None,
+                    'image': layers[index]['instances'][0].get('image'),
+                    'bbox': layers[index]['instances'][0].get('bbox')
+                }]
+            })
+
+            print(f"✓ Layer {index} reset")
+
+    # ==========================================
+    # RESET ALL
+    def reset_all(self):
+        for i in range(len(self.dataset.layers)):
+            self.reset_layer(i)
+
+    # ==========================================
+    # STATUS (FROM YOUR IMAGE)
+    def show_status(self):
+        layers = self.dataset.layers
+
+        print("\nLayer Properties")
+        print("=" * 80)
+
+        seen_files = {}
+
+        for layer in layers:
+            file_key = str(layer['file'])
+
+            if file_key not in seen_files:
+                seen_files[file_key] = []
+
+            seen_files[file_key].append(layer)
+
+        for layer in layers:
+            i = layer['index']
+            instance = layer['instances'][0]
+
+            status = "✓" if layer['enabled'] else "✗"
+            layer_type = layer['type'].capitalize()
+
+            duplicates = seen_files[str(layer['file'])]
+            is_duplicate = len(duplicates) > 1 and layer != duplicates[0]
+
+            props = []
+            props.append(f"pos={instance['position']}")
+            props.append(f"scale={instance['scale']:.2f}")
+            props.append(f"rot={instance['rotation']:.1f}")
+            props.append(f"flip_h={instance['flip_horizontal']}")
+            props.append(f"flip_v={instance['flip_vertical']}")
+            props.append(f"color={instance['color_mode']}")
+            props.append(f"intensity={instance['color_intensity']:.1f}")
+
+            props_str = ", ".join(props)
+
+            dup_mark = " [DUPLICATE]" if is_duplicate else ""
+
+            print(f"{status} Layer {i:2d} ({layer_type:10s}): {props_str}{dup_mark}")
+
+        print("=" * 80)
+
+    # ==========================================
+    # INTERNAL MASK (FROM YOUR CODE)
+    def _generate_structured_mask(self, alpha):
+        H, W = alpha.shape
+
+        ys, xs = np.where(alpha)
+        if len(ys) == 0:
+            return np.zeros_like(alpha)
+
+        y_min, y_max = ys.min(), ys.max()
+        x_min, x_max = xs.min(), xs.max()
+
+        mask = np.zeros_like(alpha)
+
+        shape_type = random.choice(["ellipse", "blob", "cut"])
+
+        if shape_type == "ellipse":
+            temp = np.zeros_like(alpha, dtype=np.uint8)
+
+            center = (
+                random.randint(x_min, x_max),
+                random.randint(y_min, y_max)
+            )
+
+            axes = (
+                random.randint(10, max(10, (x_max - x_min)//3)),
+                random.randint(10, max(10, (y_max - y_min)//3))
+            )
+
+            cv2.ellipse(temp, center, axes, 0, 0, 360, 1, -1)
+            mask = temp.astype(bool)
+
+        elif shape_type == "blob":
+            noise = np.random.rand(H, W)
+            blob = (noise > 0.8).astype(np.uint8)
+            blob = cv2.GaussianBlur(blob.astype(float), (15, 15), 0)
+            mask = blob > 0.4
+
+        else:
+            thickness = random.randint(5, 20)
+            if random.random() < 0.5:
+                x = random.randint(x_min, x_max)
+                mask[:, max(0, x-thickness):min(W, x+thickness)] = 1
+            else:
+                y = random.randint(y_min, y_max)
+                mask[max(0, y-thickness):min(H, y+thickness), :] = 1
+
+            mask = mask.astype(bool)
+
+        return mask & alpha
