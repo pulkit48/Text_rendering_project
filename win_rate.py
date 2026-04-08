@@ -618,6 +618,7 @@ class LayerEditor:
             axes[1].imshow(new_img); axes[1].axis('off')
             plt.tight_layout()
             plt.show()
+
     # ==========================================
     # Interaction Visualization
     # ==========================================
@@ -657,7 +658,7 @@ class LayerEditor:
     
     
     # ==========================================
-    # Break Contact
+    # Break Contact (scale-aware + axis-aware)
     # ==========================================
     def break_contact(self, visualize=False):
         layers = self.dataset.layers
@@ -705,18 +706,22 @@ class LayerEditor:
         if overlap_x <= 0 or overlap_y <= 0:
             return
     
-        shift = random.randint(30, 80)
+        obj_w = bx2 - bx1
+        obj_h = by2 - by1
+        base = max(obj_w, obj_h)
+    
+        shift = int(max(overlap_x, overlap_y) + base * random.uniform(0.3, 0.8))
     
         if overlap_x > overlap_y:
             if x_min < rx_min:
-                x -= (overlap_x + shift)
+                x -= shift
             else:
-                x += (overlap_x + shift)
+                x += shift
         else:
             if y_min < ry_min:
-                y -= (overlap_y + shift)
+                y -= shift
             else:
-                y += (overlap_y + shift)
+                y += shift
     
         move['position'] = (x, y)
     
@@ -725,7 +730,7 @@ class LayerEditor:
     
     
     # ==========================================
-    # Force Contact
+    # Force Contact (scale-aware)
     # ==========================================
     def force_contact(self, visualize=False):
         layers = self.dataset.layers
@@ -765,9 +770,17 @@ class LayerEditor:
         cx_r = rx + (rb[2]-rb[0]) // 2
         cy_r = ry + (rb[3]-rb[1]) // 2
     
+        base = max(mb[2]-mb[0], mb[3]-mb[1])
+        shift = int(base * random.uniform(0.1, 0.3))
+    
+        dx = cx_r - cx_m
+        dy = cy_r - cy_m
+    
+        norm = max(1, (dx**2 + dy**2) ** 0.5)
+    
         move['position'] = (
-            x + (cx_r - cx_m) + random.randint(-10, 10),
-            y + (cy_r - cy_m) + random.randint(-10, 10)
+            x + int(dx + shift * dx / norm),
+            y + int(dy + shift * dy / norm)
         )
     
         if visualize:
@@ -775,7 +788,7 @@ class LayerEditor:
     
     
     # ==========================================
-    # Force Overlap
+    # Force Overlap (scale-aware)
     # ==========================================
     def force_overlap(self, visualize=False):
         layers = self.dataset.layers
@@ -798,19 +811,25 @@ class LayerEditor:
     
         if a1 < a2:
             move, ref = l1, l2
+            mb = b1
         else:
             move, ref = l2, l1
+            mb = b2
     
         rx, ry = ref['position']
     
+        base = max(mb[2]-mb[0], mb[3]-mb[1])
+        shift = int(base * random.uniform(0.2, 0.5))
+    
         move['position'] = (
-            rx + random.randint(-10, 10),
-            ry + random.randint(-10, 10)
+            rx + random.randint(-shift, shift),
+            ry + random.randint(-shift, shift)
         )
     
         if visualize:
             self.visualize_interaction(i, j, "After")
-        
+    
+    
     def reset_layer(self, index: int):
         layers = self.dataset.layers
 
