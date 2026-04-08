@@ -456,56 +456,7 @@ class LayerEditor:
         inst['saturation_boost'] = saturation_boost
         inst['brightness_adjust'] = brightness_adjust
 
-    # ==========================================
-    # BUG 8 FIX: the original_image is now preserved in preprocess(), so edits
-    # here only mutate 'image'.  The visualize param is kept but renamed
-    # internally to avoid shadowing the renderer method.
-    # ==========================================
-    def remove_random_part(self, index: int, visualize=True):
-        import matplotlib.pyplot as plt
-
-        layer = self.dataset.layers[index]
-        inst = layer['instances'][0]
-
-        if inst['image'] is None:
-            print("✗ No image found")
-            return
-
-        original_img = np.array(inst['image'], dtype=np.uint8)
-        alpha = original_img[:, :, 3] > 0
-        mask = self._generate_structured_mask(alpha)
-
-        edited = original_img.copy()
-        edited[mask] = [0, 0, 0, 0]
-
-        edited_img = Image.fromarray(edited, "RGBA")
-        inst['image'] = edited_img
-
-        print(f"✓ Layer {index} random part removed")
-
-        if visualize:
-            fig, axes = plt.subplots(1, 3, figsize=(12, 4))
-            axes[0].imshow(original_img)
-            axes[0].set_title("Before edit")
-            axes[0].axis('off')
-            axes[1].imshow(mask, cmap='gray')
-            axes[1].set_title("Mask")
-            axes[1].axis('off')
-            axes[2].imshow(edited_img)
-            axes[2].set_title("After edit")
-            axes[2].axis('off')
-            plt.tight_layout()
-            plt.show()
-
-    # ==========================================
-    # BUG 2 + BUG 4 FIX:
-    #   - get_edge_mask now operates on the live image (fixed in LayerDataset),
-    #     so mask dimensions always match the current instance image.
-    #   - Zero-shift case: skip pixels where dy==dx==0 to avoid self-erasure.
-    #   - Destination collision: only clear the source pixel when the
-    #     destination pixel was originally transparent (i.e. we are genuinely
-    #     moving the pixel outward, not stomping another edge pixel).
-    # ==========================================
+    # =====================================
     def distort_object_edge(self, index: int,
                             max_shift: int = 3,
                             probability: float = 0.7,
@@ -662,54 +613,82 @@ class LayerEditor:
     # BUG 5 FIX: blob branch is now seeded entirely within the object bounding
     # box so the random noise is guaranteed to land on visible pixels.
     # ==========================================
-    def _generate_structured_mask(self, alpha):
-        H, W = alpha.shape
+    def remove_random_part(self, index: int, visualize=True):
+    import matplotlib.pyplot as plt
 
-        ys, xs = np.where(alpha)
-        if len(ys) == 0:
-            return np.zeros_like(alpha)
+    layer = self.dataset.layers[index]
+    inst = layer['instances'][0]
 
-        y_min, y_max = ys.min(), ys.max()
-        x_min, x_max = xs.min(), xs.max()
+    if inst['image'] is None:
+        print("✗ No image found")
+        return
 
-        mask = np.zeros_like(alpha)
-        shape_type = random.choice(["ellipse", "blob", "cut"])
+    img = np.array(inst['image'], dtype=np.uint8)
+    alpha = img[:, :, 3] > 0
 
-        if shape_type == "ellipse":
-            temp = np.zeros_like(alpha, dtype=np.uint8)
-            center = (
-                random.randint(x_min, x_max),
-                random.randint(y_min, y_max)
-            )
-            axes = (
-                random.randint(10, max(10, (x_max - x_min) // 3)),
-                random.randint(10, max(10, (y_max - y_min) // 3))
-            )
-            cv2.ellipse(temp, center, axes, 0, 0, 360, 1, -1)
-            mask = temp.astype(bool)
+    H, W = alpha.shape
 
-        elif shape_type == "blob":
-            # BUG 5 FIX: generate noise only inside the object bounding box
-            # so the blob is guaranteed to overlap visible pixels
-            obj_h = y_max - y_min + 1
-            obj_w = x_max - x_min + 1
+    # ----------------------------------
+    # Object bounding box
+    # ----------------------------------
+    ys, xs = np.where(alpha)
+    if len(ys) == 0:
+        print("✗ Empty object")
+        return
 
-            noise = np.random.rand(obj_h, obj_w)
-            blob_crop = (noise > 0.8).astype(np.uint8)
-            blob_crop = cv2.GaussianBlur(blob_crop.astype(float), (15, 15), 0)
+    y_min, y_max = ys.min(), ys.max()
+    x_min, x_max = xs.min(), xs.max()
 
-            blob = np.zeros((H, W), dtype=float)
-            blob[y_min:y_max+1, x_min:x_max+1] = blob_crop
-            mask = blob > 0.4
+    obj_h = y_max - y_min + 1
+    obj_w = x_max - x_min + 1
 
-        else:  # cut
-            thickness = random.randint(5, 20)
-            if random.random() < 0.5:
-                x = random.randint(x_min, x_max)
-                mask[:, max(0, x - thickness):min(W, x + thickness)] = 1
-            else:
-                y = random.randint(y_min, y_max)
-                mask[max(0, y - thickness):min(H, y + thickness), :] = 1
-            mask = mask.astype(bool)
+    # ----------------------------------
+    # Generate ONE random organic mask
+    # ----------------------------------
+    noise = np.random.rand(obj_h, obj_w)
 
-        return mask & alpha
+    # Smooth → controls shape coherence
+    k = random.choice([11, 15, 21])
+    noise = cv2.GaussianBlur(noise, (k, k), 0)
+
+    # Threshold → controls size
+    thresh = random.uniform(0.4, 0.7)
+    blob = noise > thresh
+
+    # Place inside full image
+    mask = np.zeros((H, W), dtype=bool)
+    mask[y_min:y_max+1, x_min:x_max+1] = blob
+
+    # Ensure only object pixels are affected
+    final_mask = mask & alpha
+
+    # ----------------------------------
+    # Apply removal
+    # ----------------------------------
+    edited = img.copy()
+    edited[final_mask] = [0, 0, 0, 0]
+
+    inst['image'] = Image.fromarray(edited, "RGBA")
+
+    print(f"✓ Layer {index} random organic part removed")
+
+    # ----------------------------------
+    # Visualization
+    # ----------------------------------
+    if visualize:
+        fig, axes = plt.subplots(1, 3, figsize=(12, 4))
+
+        axes[0].imshow(img)
+        axes[0].set_title("Before")
+        axes[0].axis('off')
+
+        axes[1].imshow(final_mask, cmap='gray')
+        axes[1].set_title("Mask")
+        axes[1].axis('off')
+
+        axes[2].imshow(edited)
+        axes[2].set_title("After")
+        axes[2].axis('off')
+
+        plt.tight_layout()
+        plt.show()
