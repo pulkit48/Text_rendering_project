@@ -619,23 +619,29 @@ class LayerEditor:
             plt.tight_layout()
             plt.show()
 
-    def _get_world_bbox(inst):
+        # ==========================================
+    # Helpers
+    # ==========================================
+    def _get_world_bbox(self, inst):
         b = inst['bbox']
         x, y = inst['position']
         return (b[0] + x, b[1] + y, b[2] + x, b[3] + y)
     
     
-    def _overlap(wb1, wb2):
+    def _overlap(self, wb1, wb2):
         ox = min(wb1[2], wb2[2]) - max(wb1[0], wb2[0])
         oy = min(wb1[3], wb2[3]) - max(wb1[1], wb2[1])
         return max(0, ox), max(0, oy)
     
     
-    def _are_touching(wb1, wb2):
-        ox, oy = _overlap(wb1, wb2)
+    def _are_touching(self, wb1, wb2):
+        ox, oy = self._overlap(wb1, wb2)
         return ox > 0 and oy > 0
     
     
+    # ==========================================
+    # Visualization
+    # ==========================================
     def visualize_interaction(self, idx1, idx2, title=""):
         import matplotlib.pyplot as plt
         import matplotlib.patches as patches
@@ -650,14 +656,16 @@ class LayerEditor:
     
         for idx, color in [(idx1, 'red'), (idx2, 'blue')]:
             inst = layers[idx]['instances'][0]
-            wb = _get_world_bbox(inst)
+            wb = self._get_world_bbox(inst)
+    
             w = wb[2] - wb[0]
             h = wb[3] - wb[1]
     
-            import matplotlib.patches as patches
             rect = patches.Rectangle(
                 (wb[0], wb[1]), w, h,
-                linewidth=2, edgecolor=color, facecolor='none'
+                linewidth=2,
+                edgecolor=color,
+                facecolor='none'
             )
             ax.add_patch(rect)
             ax.text(wb[0], wb[1], f"L{idx}", color=color)
@@ -667,6 +675,9 @@ class LayerEditor:
         plt.show()
     
     
+    # ==========================================
+    # Break Contact
+    # ==========================================
     def break_contact(self, visualize=False):
         layers = self.dataset.layers
         candidates = [i for i in range(len(layers)) if layers[i]['type'] != 'background']
@@ -678,11 +689,10 @@ class LayerEditor:
         l1 = layers[i]['instances'][0]
         l2 = layers[j]['instances'][0]
     
-        wb1 = _get_world_bbox(l1)
-        wb2 = _get_world_bbox(l2)
+        wb1 = self._get_world_bbox(l1)
+        wb2 = self._get_world_bbox(l2)
     
-        if not _are_touching(wb1, wb2):
-            print(f"✗ Layers {i} and {j} are not in contact, nothing to break")
+        if not self._are_touching(wb1, wb2):
             return
     
         if visualize:
@@ -692,54 +702,44 @@ class LayerEditor:
         a2 = (l2['bbox'][2] - l2['bbox'][0]) * (l2['bbox'][3] - l2['bbox'][1])
     
         move = l1 if a1 < a2 else l2
-        move_wb = wb1 if a1 < a2 else wb2
-        ref_wb  = wb2 if a1 < a2 else wb1
+        ref  = l2 if a1 < a2 else l1
+    
         mb = move['bbox']
-    
-        obj_w = mb[2] - mb[0]
-        obj_h = mb[3] - mb[1]
-        base  = max(obj_w, obj_h)
-    
         x, y = move['position']
-        succeeded = False
     
-        for attempt in range(2):
-            ox, oy = _overlap(_get_world_bbox(move), ref_wb)
+        base = max(mb[2] - mb[0], mb[3] - mb[1])
+    
+        for _ in range(2):
+            wb_move = self._get_world_bbox(move)
+            wb_ref  = self._get_world_bbox(ref)
+    
+            ox, oy = self._overlap(wb_move, wb_ref)
     
             if ox <= 0 and oy <= 0:
-                succeeded = True
                 break
     
             shift = int(max(ox, oy) + base * random.uniform(0.3, 0.8))
     
             if ox > oy:
-                if move_wb[0] < ref_wb[0]:
+                if wb_move[0] < wb_ref[0]:
                     x -= shift
                 else:
                     x += shift
             else:
-                if move_wb[1] < ref_wb[1]:
+                if wb_move[1] < wb_ref[1]:
                     y -= shift
                 else:
                     y += shift
     
             move['position'] = (x, y)
-            move_wb = _get_world_bbox(move)
-    
-        if not succeeded:
-            ox, oy = _overlap(_get_world_bbox(move), ref_wb)
-            if ox <= 0 and oy <= 0:
-                succeeded = True
-    
-        if not succeeded:
-            print(f"✗ Could not fully separate layers {i} and {j} after 2 attempts")
-        else:
-            print(f"✓ Layers {i} and {j} successfully separated")
     
         if visualize:
             self.visualize_interaction(i, j, "After")
     
     
+    # ==========================================
+    # Force Contact
+    # ==========================================
     def force_contact(self, visualize=False):
         layers = self.dataset.layers
         candidates = [i for i in range(len(layers)) if layers[i]['type'] != 'background']
@@ -751,11 +751,10 @@ class LayerEditor:
         l1 = layers[i]['instances'][0]
         l2 = layers[j]['instances'][0]
     
-        wb1 = _get_world_bbox(l1)
-        wb2 = _get_world_bbox(l2)
+        wb1 = self._get_world_bbox(l1)
+        wb2 = self._get_world_bbox(l2)
     
-        if _are_touching(wb1, wb2):
-            print(f"✗ Layers {i} and {j} are already in contact")
+        if self._are_touching(wb1, wb2):
             return
     
         if visualize:
@@ -765,18 +764,20 @@ class LayerEditor:
         a2 = (l2['bbox'][2] - l2['bbox'][0]) * (l2['bbox'][3] - l2['bbox'][1])
     
         move, ref = (l1, l2) if a1 < a2 else (l2, l1)
+    
         mb = move['bbox']
+        rb = ref['bbox']
     
         x, y = move['position']
         rx, ry = ref['position']
-        rb = ref['bbox']
     
-        cx_m = x + (mb[2] - mb[0]) // 2
-        cy_m = y + (mb[3] - mb[1]) // 2
-        cx_r = rx + (rb[2] - rb[0]) // 2
-        cy_r = ry + (rb[3] - rb[1]) // 2
+        cx_m = x + (mb[2]-mb[0]) // 2
+        cy_m = y + (mb[3]-mb[1]) // 2
     
-        base  = max(mb[2] - mb[0], mb[3] - mb[1])
+        cx_r = rx + (rb[2]-rb[0]) // 2
+        cy_r = ry + (rb[3]-rb[1]) // 2
+    
+        base = max(mb[2]-mb[0], mb[3]-mb[1])
         shift = int(base * random.uniform(0.1, 0.3))
     
         dx = cx_r - cx_m
@@ -788,18 +789,13 @@ class LayerEditor:
             y + int(dy + shift * dy / norm)
         )
     
-        wb_move_after = _get_world_bbox(move)
-        wb_ref = _get_world_bbox(ref)
-    
-        if _are_touching(wb_move_after, wb_ref):
-            print(f"✓ Layers {i} and {j} are now in contact")
-        else:
-            print(f"✗ Layers {i} and {j} could not be brought into contact")
-    
         if visualize:
             self.visualize_interaction(i, j, "After")
     
     
+    # ==========================================
+    # Force Overlap
+    # ==========================================
     def force_overlap(self, visualize=False):
         layers = self.dataset.layers
         candidates = [i for i in range(len(layers)) if layers[i]['type'] != 'background']
@@ -811,14 +807,12 @@ class LayerEditor:
         l1 = layers[i]['instances'][0]
         l2 = layers[j]['instances'][0]
     
-        wb1 = _get_world_bbox(l1)
-        wb2 = _get_world_bbox(l2)
+        wb1 = self._get_world_bbox(l1)
+        wb2 = self._get_world_bbox(l2)
     
-        if _are_touching(wb1, wb2):
-            ox, oy = _overlap(wb1, wb2)
-            if ox > 0 and oy > 0:
-                print(f"✗ Layers {i} and {j} are already overlapping")
-                return
+        ox, oy = self._overlap(wb1, wb2)
+        if ox > 0 and oy > 0:
+            return
     
         if visualize:
             self.visualize_interaction(i, j, "Before")
@@ -827,25 +821,17 @@ class LayerEditor:
         a2 = (l2['bbox'][2] - l2['bbox'][0]) * (l2['bbox'][3] - l2['bbox'][1])
     
         move, ref = (l1, l2) if a1 < a2 else (l2, l1)
-        mb = move['bbox']
     
+        mb = move['bbox']
         rx, ry = ref['position']
-        base  = max(mb[2] - mb[0], mb[3] - mb[1])
+    
+        base = max(mb[2]-mb[0], mb[3]-mb[1])
         shift = int(base * random.uniform(0.2, 0.5))
     
         move['position'] = (
             rx + random.randint(-shift, shift),
             ry + random.randint(-shift, shift)
         )
-    
-        wb_move_after = _get_world_bbox(move)
-        wb_ref = _get_world_bbox(ref)
-        ox, oy = _overlap(wb_move_after, wb_ref)
-    
-        if ox > 0 and oy > 0:
-            print(f"✓ Layers {i} and {j} are now overlapping")
-        else:
-            print(f"✗ Layers {i} and {j} could not be forced into overlap")
     
         if visualize:
             self.visualize_interaction(i, j, "After")
