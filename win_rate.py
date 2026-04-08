@@ -946,15 +946,17 @@ class LayerEditor:
         return int(np.mean(widths)), int(np.mean(heights))
 
 
-    def _resize_patch_to_target(self, patch_img, target_w, target_h, jitter=0.25):
-        jw = int(target_w * random.uniform(1 - jitter, 1 + jitter))
-        jh = int(target_h * random.uniform(1 - jitter, 1 + jitter))
-
-        jw = max(10, jw)
-        jh = max(10, jh)
-
-        return patch_img.resize((jw, jh), Image.LANCZOS)
-
+    
+    def _resize_patch_to_target(self, patch_img, target_w, target_h, scale_range=(0.75, 1.25)):
+        scale = random.uniform(*scale_range)
+    
+        new_w = int(target_w * scale)
+        new_h = int(target_h * scale)
+    
+        new_w = max(10, new_w)
+        new_h = max(10, new_h)
+    
+        return patch_img.resize((new_w, new_h), Image.LANCZOS)
 
     def _make_fresh_instance(self, image, bbox):
         return {
