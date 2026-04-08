@@ -545,74 +545,73 @@ class LayerEditor:
             plt.tight_layout()
             plt.show()
 
-    def distort_object_edge(self, index: int,
-                            max_shift: int = 3,
-                            probability: float = 0.7,
-                            visualize: bool = False):
+    def distort_object_edge(self, index: int, mode=None, visualize=False):
         import matplotlib.pyplot as plt
-
-        layers = self.dataset.layers
-
-        if not (0 <= index < len(layers)):
-            print("✗ Invalid layer index")
-            return
-
-        layer = layers[index]
-
-        if layer['type'] == 'background':
-            print("✗ Cannot distort background")
-            return
-
+    
+        layer = self.dataset.layers[index]
         inst = layer['instances'][0]
-
-        if inst['image'] is None:
-            print("✗ No object image")
+    
+        if layer['type'] == 'background' or inst['image'] is None:
             return
-
+    
         img = np.array(inst['image'], dtype=np.uint8)
-        H, W, _ = img.shape
-
-        # get_edge_mask is now computed from the live image (Bug 2 fix)
-        edge_mask = self.dataset.get_edge_mask(index, thickness=2)
-
-        if edge_mask is None:
-            print("✗ No edge mask available")
+        alpha = img[:, :, 3] > 0
+    
+        edge = self.dataset.get_edge_mask(index, thickness=2)
+        if edge is None:
             return
-
-        distorted = img.copy()
-        ys, xs = np.where(edge_mask)
-
-        for y, x in zip(ys, xs):
-            if random.random() > probability:
-                continue
-
-            dy = random.randint(-max_shift, max_shift)
-            dx = random.randint(-max_shift, max_shift)
-
-            # BUG 4 FIX: skip zero-shift — clearing src with no move erases pixel
-            if dy == 0 and dx == 0:
-                continue
-
-            ny = int(np.clip(y + dy, 0, H - 1))
-            nx = int(np.clip(x + dx, 0, W - 1))
-
-            # Only move pixel outward (destination was transparent in original)
-            # This prevents overwriting another edge pixel that was shifted here
-            if img[ny, nx, 3] == 0:
-                distorted[ny, nx] = img[y, x]
-                distorted[y, x] = [0, 0, 0, 0]
-
-        inst['image'] = Image.fromarray(distorted, "RGBA")
-        print(f"✓ Edge distortion applied to layer {index}")
-
+    
+        H, W = alpha.shape
+        mask = np.zeros_like(alpha, dtype=bool)
+    
+        if mode is None:
+            mode = random.choice(["erode", "dilate", "jitter"])
+    
+        if mode == "erode":
+            k = random.choice([3, 5, 7])
+            kernel = np.ones((k, k), np.uint8)
+            new_alpha = cv2.erode(alpha.astype(np.uint8), kernel)
+            mask = (alpha & (~new_alpha.astype(bool)))
+    
+        elif mode == "dilate":
+            k = random.choice([3, 5, 7])
+            kernel = np.ones((k, k), np.uint8)
+            new_alpha = cv2.dilate(alpha.astype(np.uint8), kernel)
+            mask = (new_alpha.astype(bool) & (~alpha))
+    
+        else:
+            ys, xs = np.where(edge)
+            num = int(len(ys) * random.uniform(0.2, 0.6))
+    
+            indices = np.random.choice(len(ys), num, replace=False)
+    
+            for i in indices:
+                y, x = ys[i]
+                dy = random.randint(-3, 3)
+                dx = random.randint(-3, 3)
+    
+                ny = np.clip(y + dy, 0, H - 1)
+                nx = np.clip(x + dx, 0, W - 1)
+    
+                mask[ny, nx] = True
+    
+        new_img = img.copy()
+    
+        if mode == "erode":
+            new_img[mask] = [0, 0, 0, 0]
+    
+        elif mode == "dilate":
+            new_img[mask] = [255, 255, 255, 255]
+    
+        else:
+            new_img[mask] = img[edge]
+    
+        inst['image'] = Image.fromarray(new_img, "RGBA")
+    
         if visualize:
             fig, axes = plt.subplots(1, 2, figsize=(8, 4))
-            axes[0].imshow(img)
-            axes[0].set_title("Before")
-            axes[0].axis('off')
-            axes[1].imshow(distorted)
-            axes[1].set_title("After")
-            axes[1].axis('off')
+            axes[0].imshow(img); axes[0].axis('off')
+            axes[1].imshow(new_img); axes[1].axis('off')
             plt.tight_layout()
             plt.show()
 
