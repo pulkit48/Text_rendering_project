@@ -548,21 +548,30 @@ class LayerEditor:
     def distort_object_edge(self, index: int, mode=None, visualize=False):
         import matplotlib.pyplot as plt
     
-        layer = self.dataset.layers[index]
+        layers = self.dataset.layers
+    
+        if not (0 <= index < len(layers)):
+            return
+    
+        layer = layers[index]
+    
+        if layer['type'] == 'background':
+            return
+    
         inst = layer['instances'][0]
     
-        if layer['type'] == 'background' or inst['image'] is None:
+        if inst['image'] is None:
             return
     
         img = np.array(inst['image'], dtype=np.uint8)
         alpha = img[:, :, 3] > 0
     
-        edge = self.dataset.get_edge_mask(index, thickness=2)
-        if edge is None:
+        edge_mask = self.dataset.get_edge_mask(index, thickness=2)
+        if edge_mask is None:
             return
     
         H, W = alpha.shape
-        mask = np.zeros_like(alpha, dtype=bool)
+        new_img = img.copy()
     
         if mode is None:
             mode = random.choice(["erode", "dilate", "jitter"])
@@ -572,39 +581,34 @@ class LayerEditor:
             kernel = np.ones((k, k), np.uint8)
             new_alpha = cv2.erode(alpha.astype(np.uint8), kernel)
             mask = (alpha & (~new_alpha.astype(bool)))
+            new_img[mask] = [0, 0, 0, 0]
     
         elif mode == "dilate":
             k = random.choice([3, 5, 7])
             kernel = np.ones((k, k), np.uint8)
             new_alpha = cv2.dilate(alpha.astype(np.uint8), kernel)
             mask = (new_alpha.astype(bool) & (~alpha))
-    
-        else:
-            ys, xs = np.where(edge)
-            num = int(len(ys) * random.uniform(0.2, 0.6))
-    
-            indices = np.random.choice(len(ys), num, replace=False)
-    
-            for i in indices:
-                y, x = ys[i]
-                dy = random.randint(-3, 3)
-                dx = random.randint(-3, 3)
-    
-                ny = np.clip(y + dy, 0, H - 1)
-                nx = np.clip(x + dx, 0, W - 1)
-    
-                mask[ny, nx] = True
-    
-        new_img = img.copy()
-    
-        if mode == "erode":
-            new_img[mask] = [0, 0, 0, 0]
-    
-        elif mode == "dilate":
             new_img[mask] = [255, 255, 255, 255]
     
         else:
-            new_img[mask] = img[edge]
+            ys, xs = np.where(edge_mask)
+    
+            if len(ys) == 0:
+                return
+    
+            num = max(1, int(len(ys) * random.uniform(0.2, 0.6)))
+            indices = np.random.choice(len(ys), num, replace=False)
+    
+            for i in indices:
+                y, x = ys[i], xs[i]
+    
+                dy = random.randint(-3, 3)
+                dx = random.randint(-3, 3)
+    
+                ny = int(np.clip(y + dy, 0, H - 1))
+                nx = int(np.clip(x + dx, 0, W - 1))
+    
+                new_img[ny, nx] = img[y, x]
     
         inst['image'] = Image.fromarray(new_img, "RGBA")
     
