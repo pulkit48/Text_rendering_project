@@ -653,10 +653,13 @@ class LayerEditor:
     k = random.choice([5, 9, 13, 17, 21])
     noise = cv2.GaussianBlur(noise, (k, k), 0)
 
-    # random threshold → controls size
-    threshold = random.uniform(0.3, 0.7)
+    # Decide how much of the object to remove
+    target_fraction = random.uniform(0.1, 0.3)  # 10% to 30%
 
-    blob = noise > threshold   # THIS defines the random region
+    # Compute threshold based on distribution
+    threshold = np.quantile(noise, 1 - target_fraction)
+
+    blob = noise > threshold
 
     # ----------------------------------
     # Place mask back into full image
