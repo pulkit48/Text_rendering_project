@@ -675,9 +675,6 @@ class LayerEditor:
         plt.show()
     
     
-    # ==========================================
-    # Break Contact
-    # ==========================================
     def break_contact(self, visualize=False):
         layers = self.dataset.layers
         candidates = [i for i in range(len(layers)) if layers[i]['type'] != 'background']
@@ -704,39 +701,36 @@ class LayerEditor:
         move = l1 if a1 < a2 else l2
         ref  = l2 if a1 < a2 else l1
     
-        mb = move['bbox']
         x, y = move['position']
     
-        base = max(mb[2] - mb[0], mb[3] - mb[1])
+        wb_move = self._get_world_bbox(move)
+        wb_ref  = self._get_world_bbox(ref)
     
-        for _ in range(2):
-            wb_move = self._get_world_bbox(move)
-            wb_ref  = self._get_world_bbox(ref)
+        ox, oy = self._overlap(wb_move, wb_ref)
     
-            ox, oy = self._overlap(wb_move, wb_ref)
+        if ox <= 0 or oy <= 0:
+            return
     
-            if ox <= 0 and oy <= 0:
-                break
+        margin = int(0.1 * max(ox, oy)) + 2
     
-            shift = int(max(ox, oy) + base * random.uniform(0.3, 0.8))
-    
-            if ox > oy:
-                if wb_move[0] < wb_ref[0]:
-                    x -= shift
-                else:
-                    x += shift
+        if ox < oy:
+            shift = ox + margin
+            if wb_move[0] < wb_ref[0]:
+                x -= shift
             else:
-                if wb_move[1] < wb_ref[1]:
-                    y -= shift
-                else:
-                    y += shift
+                x += shift
+        else:
+            shift = oy + margin
+            if wb_move[1] < wb_ref[1]:
+                y -= shift
+            else:
+                y += shift
     
-            move['position'] = (x, y)
+        move['position'] = (x, y)
     
         if visualize:
             self.visualize_interaction(i, j, "After")
-    
-    
+        
     # ==========================================
     # Force Contact
     # ==========================================
