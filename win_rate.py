@@ -611,8 +611,7 @@ class LayerEditor:
 
     # ==========================================
     # BUG 5 FIX: blob branch is now seeded entirely within the object bounding
-    # box so the random noise is guaranteed to land on visible pixels.
-    # ==========================================
+    # box so the random noise is guaranteed to land on visible 
     def remove_random_part(self, index: int, visualize=True):
     import matplotlib.pyplot as plt
 
@@ -620,83 +619,61 @@ class LayerEditor:
     inst = layer['instances'][0]
 
     if inst['image'] is None:
-        print("✗ No image found")
         return
 
     img = np.array(inst['image'], dtype=np.uint8)
     alpha = img[:, :, 3] > 0
 
-    H, W = alpha.shape
-
-    # ----------------------------------
-    # Get object bounding box
-    # ----------------------------------
     ys, xs = np.where(alpha)
     if len(ys) == 0:
-        print("✗ Empty object")
         return
 
-    y_min, y_max = ys.min(), ys.max()
-    x_min, x_max = xs.min(), xs.max()
+    obj_pixels = list(zip(ys, xs))
+    total_pixels = len(obj_pixels)
 
-    obj_h = y_max - y_min + 1
-    obj_w = x_max - x_min + 1
+    target_fraction = random.uniform(0.1, 0.3)
 
-    # ----------------------------------
-    # Generate RANDOM REGION (core idea)
-    # ----------------------------------
+    mask = np.zeros_like(alpha, dtype=bool)
 
-    # random noise field
-    noise = np.random.rand(obj_h, obj_w)
+    num_seeds = random.randint(1, 4)
+    seeds = random.sample(obj_pixels, num_seeds)
 
-    # random smoothing → controls connectivity
-    k = random.choice([5, 9, 13, 17, 21])
-    noise = cv2.GaussianBlur(noise, (k, k), 0)
+    for sy, sx in seeds:
+        radius = random.randint(10, 40)
 
-    # Decide how much of the object to remove
-    target_fraction = random.uniform(0.1, 0.3)  # 10% to 30%
+        y_min = max(0, sy - radius)
+        y_max = min(alpha.shape[0], sy + radius)
+        x_min = max(0, sx - radius)
+        x_max = min(alpha.shape[1], sx + radius)
 
-    # Compute threshold based on distribution
-    threshold = np.quantile(noise, 1 - target_fraction)
+        h = y_max - y_min
+        w = x_max - x_min
 
-    blob = noise > threshold
+        noise = np.random.rand(h, w)
+        noise = cv2.GaussianBlur(noise, (11, 11), 0)
 
-    # ----------------------------------
-    # Place mask back into full image
-    # ----------------------------------
-    mask = np.zeros((H, W), dtype=bool)
-    mask[y_min:y_max+1, x_min:x_max+1] = blob
+        blob = noise > 0.5
 
-    # only affect object pixels
-    final_mask = mask & alpha
+        mask[y_min:y_max, x_min:x_max] |= blob
 
-    # ----------------------------------
-    # Apply removal
-    # ----------------------------------
+    mask = mask & alpha
+
+    if mask.sum() == 0:
+        y, x = random.choice(obj_pixels)
+        mask[max(0, y-5):y+5, max(0, x-5):x+5] = True
+
+    if mask.sum() > 0.5 * total_pixels:
+        mask = mask & (np.random.rand(*mask.shape) > 0.5)
+
     edited = img.copy()
-    edited[final_mask] = [0, 0, 0, 0]
+    edited[mask] = [0, 0, 0, 0]
 
     inst['image'] = Image.fromarray(edited, "RGBA")
 
-    print(f"✓ Layer {index} random region removed")
-
-    # ----------------------------------
-    # Visualization
-    # ----------------------------------
     if visualize:
         fig, axes = plt.subplots(1, 3, figsize=(12, 4))
-
-        axes[0].imshow(img)
-        axes[0].set_title("Before")
-        axes[0].axis('off')
-
-        axes[1].imshow(final_mask, cmap='gray')
-        axes[1].set_title("Random Region")
-        axes[1].axis('off')
-
-        axes[2].imshow(edited)
-        axes[2].set_title("After")
-        axes[2].axis('off')
-
+        axes[0].imshow(img); axes[0].axis('off')
+        axes[1].imshow(mask, cmap='gray'); axes[1].axis('off')
+        axes[2].imshow(edited); axes[2].axis('off')
         plt.tight_layout()
         plt.show()
