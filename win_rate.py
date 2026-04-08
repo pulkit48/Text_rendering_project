@@ -833,15 +833,27 @@ class LayerEditor:
     
     def reset_layer(self, index: int):
         layers = self.dataset.layers
-
+    
         if not (0 <= index < len(layers)):
             return
-
+    
         layer = layers[index]
+    
+        # ✅ NEW: remove synthetic / foreign objects
+        if layer.get('file') is None:
+            layers.pop(index)
+    
+            # reindex all layers
+            for i, l in enumerate(layers):
+                l['index'] = i
+    
+            print(f"✓ Removed synthetic layer {index}")
+            return
+    
+        # ===== Existing reset logic =====
         inst = layer['instances'][0]
-
         original_image = inst.get('original_image')
-
+    
         layers[index].update({
             'enabled': True,
             'count': 1,
@@ -858,11 +870,10 @@ class LayerEditor:
                 'bbox': inst.get('bbox'),
                 'object_mask': inst.get('object_mask'),
                 'original_image': original_image,
-                # BUG 1 FIX: always restore from original, never from current
                 'image': original_image.copy() if original_image is not None else None,
             }]
         })
-
+    
         print(f"✓ Layer {index} reset")
 
     # ==========================================
