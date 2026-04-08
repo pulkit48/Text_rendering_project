@@ -907,3 +907,184 @@ class LayerEditor:
             print(f"{status} Layer {i:2d} ({layer_type:10s}): {', '.join(props)}{dup_mark}")
 
         print("=" * 80)
+
+    def _overlap_area(self, wb1, wb2):
+      ox = max(0, min(wb1[2], wb2[2]) - max(wb1[0], wb2[0]))
+      oy = max(0, min(wb1[3], wb2[3]) - max(wb1[1], wb2[1]))
+      return ox * oy
+
+
+    def _compute_average_object_size(self):
+        widths, heights = [], []
+
+        for layer in self.dataset.layers:
+            if layer['type'] == 'background':
+                continue
+
+            inst = layer['instances'][0]
+            if inst['bbox'] is None:
+                continue
+
+            b = inst['bbox']
+            widths.append(b[2] - b[0])
+            heights.append(b[3] - b[1])
+
+        if not widths:
+            return None, None
+
+        return int(np.mean(widths)), int(np.mean(heights))
+
+
+    def _resize_patch_to_target(self, patch_img, target_w, target_h, jitter=0.25):
+        jw = int(target_w * random.uniform(1 - jitter, 1 + jitter))
+        jh = int(target_h * random.uniform(1 - jitter, 1 + jitter))
+
+        jw = max(10, jw)
+        jh = max(10, jh)
+
+        return patch_img.resize((jw, jh), Image.LANCZOS)
+
+
+    def _make_fresh_instance(self, image, bbox):
+        return {
+            'position': (0, 0),
+            'scale': 1.0,
+            'rotation': 0.0,
+            'flip_horizontal': False,
+            'flip_vertical': False,
+            'color_mode': None,
+            'color_intensity': 0.5,
+            'saturation_boost': None,
+            'brightness_adjust': None,
+            'bbox': bbox,
+            'object_mask': np.array(image)[:, :, 3] > 0,
+            'original_image': image.copy(),
+            'image': image,
+        }
+
+
+    def _find_position(self, patch_w, patch_h, canvas_w, canvas_h,
+                      existing_wbboxes, placed_wbboxes,
+                      max_overlap_ratio=0.15, max_attempts=40):
+
+        best_pos = None
+        best_score = float('inf')
+
+        for _ in range(max_attempts):
+            x = random.randint(0, max(0, canvas_w - patch_w))
+            y = random.randint(0, max(0, canvas_h - patch_h))
+
+            candidate = (x, y, x + patch_w, y + patch_h)
+            patch_area = patch_w * patch_h
+
+            total_overlap = 0
+            for wb in existing_wbboxes + placed_wbboxes:
+                total_overlap += self._overlap_area(candidate, wb)
+
+            overlap_ratio = total_overlap / patch_area
+
+            if overlap_ratio < best_score:
+                best_score = overlap_ratio
+                best_pos = (x, y)
+
+            if overlap_ratio == 0:
+                break
+
+        return best_pos
+
+    def place_foreign_objects(self, patch_pool, count=None, visualize=False):
+      if not patch_pool:
+          print("✗ Patch pool is empty")
+          return
+
+      layers = self.dataset.layers
+      canvas_w, canvas_h = self.dataset.canvas_size
+
+      count = count if count is not None else random.randint(1, 4)
+      count = max(1, min(4, count))
+
+      patches = random.sample(patch_pool, min(count, len(patch_pool)))
+
+      target_w, target_h = self._compute_average_object_size()
+
+      if target_w is None:
+          target_w = canvas_w // 6
+          target_h = canvas_h // 6
+
+      existing_wbboxes = []
+      for layer in layers:
+          if layer['type'] == 'background':
+              continue
+
+          inst = layer['instances'][0]
+          if inst['bbox'] is not None:
+              existing_wbboxes.append(self._get_world_bbox(inst))
+
+      placed_wbboxes = []
+      placed_count = 0
+
+      for patch_img in patches:
+
+          if not isinstance(patch_img, Image.Image):
+              patch_img = Image.fromarray(patch_img).convert('RGBA')
+          else:
+              patch_img = patch_img.convert('RGBA')
+
+          patch_img = self._resize_patch_to_target(patch_img, target_w, target_h)
+
+          arr = np.array(patch_img)
+          alpha = arr[:, :, 3] > 0
+
+          ys = np.where(np.any(alpha, axis=1))[0]
+          xs = np.where(np.any(alpha, axis=0))[0]
+
+          if len(ys) == 0 or len(xs) == 0:
+              continue
+
+          y1, y2 = ys[[0, -1]]
+          x1, x2 = xs[[0, -1]]
+
+          cropped = patch_img.crop((x1, y1, x2 + 1, y2 + 1))
+
+          pw, ph = cropped.size
+
+          pos = self._find_position(
+              pw, ph, canvas_w, canvas_h,
+              existing_wbboxes, placed_wbboxes
+          )
+
+          if pos is None:
+              continue
+
+          px, py = pos
+
+          bbox = (0, 0, pw, ph)
+
+          inst = self._make_fresh_instance(cropped, bbox)
+          inst['position'] = (px, py)
+
+          new_layer = {
+              'index': len(layers),
+              'file': None,
+              'type': 'instance',
+              'enabled': True,
+              'count': 1,
+              'instances': [inst]
+          }
+
+          layers.append(new_layer)
+          placed_wbboxes.append((px, py, px + pw, py + ph))
+          placed_count += 1
+
+      print(f"✓ Placed {placed_count}/{len(patches)} foreign objects")
+
+      if visualize:
+          import matplotlib.pyplot as plt
+          renderer = LayerRenderer(self.dataset)
+          img = renderer.render()
+
+          plt.figure(figsize=(8, 8))
+          plt.imshow(img)
+          plt.axis('off')
+          plt.title(f"After placing {placed_count} foreign object(s)")
+          plt.show()
