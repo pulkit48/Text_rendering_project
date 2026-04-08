@@ -457,6 +457,94 @@ class LayerEditor:
         inst['brightness_adjust'] = brightness_adjust
 
     # =====================================
+    def remove_random_part(self, index: int, mode=None, visualize=True):
+        import matplotlib.pyplot as plt
+    
+        layer = self.dataset.layers[index]
+        inst = layer['instances'][0]
+    
+        if inst['image'] is None:
+            return
+    
+        img = np.array(inst['image'], dtype=np.uint8)
+        alpha = img[:, :, 3] > 0
+    
+        ys, xs = np.where(alpha)
+        if len(ys) == 0:
+            return
+    
+        obj_pixels = list(zip(ys, xs))
+        total_pixels = len(obj_pixels)
+    
+        if mode is None:
+            mode = random.choice(["solid", "split"])
+    
+        mask = np.zeros_like(alpha, dtype=bool)
+    
+        if mode == "solid":
+            sy, sx = random.choice(obj_pixels)
+    
+            radius = random.randint(20, 50)
+    
+            y_min = max(0, sy - radius)
+            y_max = min(alpha.shape[0], sy + radius)
+            x_min = max(0, sx - radius)
+            x_max = min(alpha.shape[1], sx + radius)
+    
+            h = y_max - y_min
+            w = x_max - x_min
+    
+            noise = np.random.rand(h, w)
+            noise = cv2.GaussianBlur(noise, (21, 21), 0)
+    
+            blob = noise > 0.5
+    
+            mask[y_min:y_max, x_min:x_max] = blob
+    
+        else:
+            num_seeds = random.randint(2, 5)
+            seeds = random.sample(obj_pixels, num_seeds)
+    
+            for sy, sx in seeds:
+                radius = random.randint(10, 30)
+    
+                y_min = max(0, sy - radius)
+                y_max = min(alpha.shape[0], sy + radius)
+                x_min = max(0, sx - radius)
+                x_max = min(alpha.shape[1], sx + radius)
+    
+                h = y_max - y_min
+                w = x_max - x_min
+    
+                noise = np.random.rand(h, w)
+                noise = cv2.GaussianBlur(noise, (11, 11), 0)
+    
+                blob = noise > 0.5
+    
+                mask[y_min:y_max, x_min:x_max] |= blob
+    
+        mask = mask & alpha
+    
+        if mask.sum() == 0:
+            y, x = random.choice(obj_pixels)
+            mask[max(0, y-5):y+5, max(0, x-5):x+5] = True
+    
+        if mask.sum() > 0.5 * total_pixels:
+            mask = mask & (np.random.rand(*mask.shape) > 0.5)
+    
+        edited = img.copy()
+        edited[mask] = [0, 0, 0, 0]
+    
+        inst['image'] = Image.fromarray(edited, "RGBA")
+    
+        if visualize:
+            fig, axes = plt.subplots(1, 3, figsize=(12, 4))
+            axes[0].imshow(img); axes[0].axis('off')
+            axes[1].imshow(mask, cmap='gray'); axes[1].axis('off')
+            axes[2].imshow(edited); axes[2].axis('off')
+            plt.tight_layout()
+            plt.show()
+
     def distort_object_edge(self, index: int,
                             max_shift: int = 3,
                             probability: float = 0.7,
@@ -528,10 +616,6 @@ class LayerEditor:
             plt.tight_layout()
             plt.show()
 
-    # ==========================================
-    # BUG 1 FIX: reset_layer reloads a fresh image from original_image instead
-    # of recycling whatever mutated image currently sits in the instance.
-    # ==========================================
     def reset_layer(self, index: int):
         layers = self.dataset.layers
 
@@ -608,94 +692,3 @@ class LayerEditor:
             print(f"{status} Layer {i:2d} ({layer_type:10s}): {', '.join(props)}{dup_mark}")
 
         print("=" * 80)
-
-    # ==========================================
-    # BUG 5 FIX: blob branch is now seeded entirely within the object bounding
-    # box so the random noise is guaranteed to land on visible 
-    def remove_random_part(self, index: int, mode=None, visualize=True):
-    import matplotlib.pyplot as plt
-
-    layer = self.dataset.layers[index]
-    inst = layer['instances'][0]
-
-    if inst['image'] is None:
-        return
-
-    img = np.array(inst['image'], dtype=np.uint8)
-    alpha = img[:, :, 3] > 0
-
-    ys, xs = np.where(alpha)
-    if len(ys) == 0:
-        return
-
-    obj_pixels = list(zip(ys, xs))
-    total_pixels = len(obj_pixels)
-
-    if mode is None:
-        mode = random.choice(["solid", "split"])
-
-    mask = np.zeros_like(alpha, dtype=bool)
-
-    if mode == "solid":
-        sy, sx = random.choice(obj_pixels)
-
-        radius = random.randint(20, 50)
-
-        y_min = max(0, sy - radius)
-        y_max = min(alpha.shape[0], sy + radius)
-        x_min = max(0, sx - radius)
-        x_max = min(alpha.shape[1], sx + radius)
-
-        h = y_max - y_min
-        w = x_max - x_min
-
-        noise = np.random.rand(h, w)
-        noise = cv2.GaussianBlur(noise, (21, 21), 0)
-
-        blob = noise > 0.5
-
-        mask[y_min:y_max, x_min:x_max] = blob
-
-    else:
-        num_seeds = random.randint(2, 5)
-        seeds = random.sample(obj_pixels, num_seeds)
-
-        for sy, sx in seeds:
-            radius = random.randint(10, 30)
-
-            y_min = max(0, sy - radius)
-            y_max = min(alpha.shape[0], sy + radius)
-            x_min = max(0, sx - radius)
-            x_max = min(alpha.shape[1], sx + radius)
-
-            h = y_max - y_min
-            w = x_max - x_min
-
-            noise = np.random.rand(h, w)
-            noise = cv2.GaussianBlur(noise, (11, 11), 0)
-
-            blob = noise > 0.5
-
-            mask[y_min:y_max, x_min:x_max] |= blob
-
-    mask = mask & alpha
-
-    if mask.sum() == 0:
-        y, x = random.choice(obj_pixels)
-        mask[max(0, y-5):y+5, max(0, x-5):x+5] = True
-
-    if mask.sum() > 0.5 * total_pixels:
-        mask = mask & (np.random.rand(*mask.shape) > 0.5)
-
-    edited = img.copy()
-    edited[mask] = [0, 0, 0, 0]
-
-    inst['image'] = Image.fromarray(edited, "RGBA")
-
-    if visualize:
-        fig, axes = plt.subplots(1, 3, figsize=(12, 4))
-        axes[0].imshow(img); axes[0].axis('off')
-        axes[1].imshow(mask, cmap='gray'); axes[1].axis('off')
-        axes[2].imshow(edited); axes[2].axis('off')
-        plt.tight_layout()
-        plt.show()
