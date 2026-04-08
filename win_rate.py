@@ -629,7 +629,7 @@ class LayerEditor:
     H, W = alpha.shape
 
     # ----------------------------------
-    # Object bounding box
+    # Get object bounding box
     # ----------------------------------
     ys, xs = np.where(alpha)
     if len(ys) == 0:
@@ -643,23 +643,28 @@ class LayerEditor:
     obj_w = x_max - x_min + 1
 
     # ----------------------------------
-    # Generate ONE random organic mask
+    # Generate RANDOM REGION (core idea)
     # ----------------------------------
+
+    # random noise field
     noise = np.random.rand(obj_h, obj_w)
 
-    # Smooth → controls shape coherence
-    k = random.choice([11, 15, 21])
+    # random smoothing → controls connectivity
+    k = random.choice([5, 9, 13, 17, 21])
     noise = cv2.GaussianBlur(noise, (k, k), 0)
 
-    # Threshold → controls size
-    thresh = random.uniform(0.4, 0.7)
-    blob = noise > thresh
+    # random threshold → controls size
+    threshold = random.uniform(0.3, 0.7)
 
-    # Place inside full image
+    blob = noise > threshold   # THIS defines the random region
+
+    # ----------------------------------
+    # Place mask back into full image
+    # ----------------------------------
     mask = np.zeros((H, W), dtype=bool)
     mask[y_min:y_max+1, x_min:x_max+1] = blob
 
-    # Ensure only object pixels are affected
+    # only affect object pixels
     final_mask = mask & alpha
 
     # ----------------------------------
@@ -670,7 +675,7 @@ class LayerEditor:
 
     inst['image'] = Image.fromarray(edited, "RGBA")
 
-    print(f"✓ Layer {index} random organic part removed")
+    print(f"✓ Layer {index} random region removed")
 
     # ----------------------------------
     # Visualization
@@ -683,7 +688,7 @@ class LayerEditor:
         axes[0].axis('off')
 
         axes[1].imshow(final_mask, cmap='gray')
-        axes[1].set_title("Mask")
+        axes[1].set_title("Random Region")
         axes[1].axis('off')
 
         axes[2].imshow(edited)
