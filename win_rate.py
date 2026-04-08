@@ -612,7 +612,7 @@ class LayerEditor:
     # ==========================================
     # BUG 5 FIX: blob branch is now seeded entirely within the object bounding
     # box so the random noise is guaranteed to land on visible 
-    def remove_random_part(self, index: int, visualize=True):
+    def remove_random_part(self, index: int, mode=None, visualize=True):
     import matplotlib.pyplot as plt
 
     layer = self.dataset.layers[index]
@@ -631,15 +631,15 @@ class LayerEditor:
     obj_pixels = list(zip(ys, xs))
     total_pixels = len(obj_pixels)
 
-    target_fraction = random.uniform(0.1, 0.3)
+    if mode is None:
+        mode = random.choice(["solid", "split"])
 
     mask = np.zeros_like(alpha, dtype=bool)
 
-    num_seeds = random.randint(1, 4)
-    seeds = random.sample(obj_pixels, num_seeds)
+    if mode == "solid":
+        sy, sx = random.choice(obj_pixels)
 
-    for sy, sx in seeds:
-        radius = random.randint(10, 40)
+        radius = random.randint(20, 50)
 
         y_min = max(0, sy - radius)
         y_max = min(alpha.shape[0], sy + radius)
@@ -650,11 +650,33 @@ class LayerEditor:
         w = x_max - x_min
 
         noise = np.random.rand(h, w)
-        noise = cv2.GaussianBlur(noise, (11, 11), 0)
+        noise = cv2.GaussianBlur(noise, (21, 21), 0)
 
         blob = noise > 0.5
 
-        mask[y_min:y_max, x_min:x_max] |= blob
+        mask[y_min:y_max, x_min:x_max] = blob
+
+    else:
+        num_seeds = random.randint(2, 5)
+        seeds = random.sample(obj_pixels, num_seeds)
+
+        for sy, sx in seeds:
+            radius = random.randint(10, 30)
+
+            y_min = max(0, sy - radius)
+            y_max = min(alpha.shape[0], sy + radius)
+            x_min = max(0, sx - radius)
+            x_max = min(alpha.shape[1], sx + radius)
+
+            h = y_max - y_min
+            w = x_max - x_min
+
+            noise = np.random.rand(h, w)
+            noise = cv2.GaussianBlur(noise, (11, 11), 0)
+
+            blob = noise > 0.5
+
+            mask[y_min:y_max, x_min:x_max] |= blob
 
     mask = mask & alpha
 
