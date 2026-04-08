@@ -618,7 +618,199 @@ class LayerEditor:
             axes[1].imshow(new_img); axes[1].axis('off')
             plt.tight_layout()
             plt.show()
-
+    # ==========================================
+    # Interaction Visualization
+    # ==========================================
+    def visualize_interaction(self, idx1, idx2, title=""):
+        import matplotlib.pyplot as plt
+        import matplotlib.patches as patches
+    
+        renderer = LayerRenderer(self.dataset)
+        img = renderer.render()
+    
+        fig, ax = plt.subplots(1, figsize=(6, 6))
+        ax.imshow(img)
+    
+        layers = self.dataset.layers
+    
+        for idx, color in [(idx1, 'red'), (idx2, 'blue')]:
+            inst = layers[idx]['instances'][0]
+            bbox = inst['bbox']
+            x, y = inst['position']
+    
+            w = bbox[2] - bbox[0]
+            h = bbox[3] - bbox[1]
+    
+            rect = patches.Rectangle(
+                (bbox[0] + x, bbox[1] + y),
+                w, h,
+                linewidth=2,
+                edgecolor=color,
+                facecolor='none'
+            )
+            ax.add_patch(rect)
+            ax.text(bbox[0] + x, bbox[1] + y, f"L{idx}", color=color)
+    
+        ax.set_title(title)
+        ax.axis('off')
+        plt.show()
+    
+    
+    # ==========================================
+    # Break Contact
+    # ==========================================
+    def break_contact(self, visualize=False):
+        layers = self.dataset.layers
+        candidates = [i for i in range(len(layers)) if layers[i]['type'] != 'background']
+        if len(candidates) < 2:
+            return
+    
+        i, j = random.sample(candidates, 2)
+    
+        if visualize:
+            self.visualize_interaction(i, j, "Before")
+    
+        l1 = layers[i]['instances'][0]
+        l2 = layers[j]['instances'][0]
+    
+        b1, b2 = l1['bbox'], l2['bbox']
+        x1, y1 = l1['position']
+        x2, y2 = l2['position']
+    
+        a1 = (b1[2]-b1[0]) * (b1[3]-b1[1])
+        a2 = (b2[2]-b2[0]) * (b2[3]-b2[1])
+    
+        if a1 < a2:
+            move, ref = l1, l2
+            bx1, by1, bx2, by2 = b1
+            x, y = x1, y1
+            rx, ry = x2, y2
+            rb = b2
+        else:
+            move, ref = l2, l1
+            bx1, by1, bx2, by2 = b2
+            x, y = x2, y2
+            rx, ry = x1, y1
+            rb = b1
+    
+        x_min, y_min = bx1 + x, by1 + y
+        x_max, y_max = bx2 + x, by2 + y
+    
+        rx_min, ry_min = rb[0] + rx, rb[1] + ry
+        rx_max, ry_max = rb[2] + rx, rb[3] + ry
+    
+        overlap_x = min(x_max, rx_max) - max(x_min, rx_min)
+        overlap_y = min(y_max, ry_max) - max(y_min, ry_min)
+    
+        if overlap_x <= 0 or overlap_y <= 0:
+            return
+    
+        shift = random.randint(30, 80)
+    
+        if overlap_x > overlap_y:
+            if x_min < rx_min:
+                x -= (overlap_x + shift)
+            else:
+                x += (overlap_x + shift)
+        else:
+            if y_min < ry_min:
+                y -= (overlap_y + shift)
+            else:
+                y += (overlap_y + shift)
+    
+        move['position'] = (x, y)
+    
+        if visualize:
+            self.visualize_interaction(i, j, "After")
+    
+    
+    # ==========================================
+    # Force Contact
+    # ==========================================
+    def force_contact(self, visualize=False):
+        layers = self.dataset.layers
+        candidates = [i for i in range(len(layers)) if layers[i]['type'] != 'background']
+        if len(candidates) < 2:
+            return
+    
+        i, j = random.sample(candidates, 2)
+    
+        if visualize:
+            self.visualize_interaction(i, j, "Before")
+    
+        l1 = layers[i]['instances'][0]
+        l2 = layers[j]['instances'][0]
+    
+        b1, b2 = l1['bbox'], l2['bbox']
+        x1, y1 = l1['position']
+        x2, y2 = l2['position']
+    
+        a1 = (b1[2]-b1[0]) * (b1[3]-b1[1])
+        a2 = (b2[2]-b2[0]) * (b2[3]-b2[1])
+    
+        if a1 < a2:
+            move, ref = l1, l2
+            x, y = x1, y1
+            rx, ry = x2, y2
+            mb, rb = b1, b2
+        else:
+            move, ref = l2, l1
+            x, y = x2, y2
+            rx, ry = x1, y1
+            mb, rb = b2, b1
+    
+        cx_m = x + (mb[2]-mb[0]) // 2
+        cy_m = y + (mb[3]-mb[1]) // 2
+    
+        cx_r = rx + (rb[2]-rb[0]) // 2
+        cy_r = ry + (rb[3]-rb[1]) // 2
+    
+        move['position'] = (
+            x + (cx_r - cx_m) + random.randint(-10, 10),
+            y + (cy_r - cy_m) + random.randint(-10, 10)
+        )
+    
+        if visualize:
+            self.visualize_interaction(i, j, "After")
+    
+    
+    # ==========================================
+    # Force Overlap
+    # ==========================================
+    def force_overlap(self, visualize=False):
+        layers = self.dataset.layers
+        candidates = [i for i in range(len(layers)) if layers[i]['type'] != 'background']
+        if len(candidates) < 2:
+            return
+    
+        i, j = random.sample(candidates, 2)
+    
+        if visualize:
+            self.visualize_interaction(i, j, "Before")
+    
+        l1 = layers[i]['instances'][0]
+        l2 = layers[j]['instances'][0]
+    
+        b1, b2 = l1['bbox'], l2['bbox']
+    
+        a1 = (b1[2]-b1[0]) * (b1[3]-b1[1])
+        a2 = (b2[2]-b2[0]) * (b2[3]-b2[1])
+    
+        if a1 < a2:
+            move, ref = l1, l2
+        else:
+            move, ref = l2, l1
+    
+        rx, ry = ref['position']
+    
+        move['position'] = (
+            rx + random.randint(-10, 10),
+            ry + random.randint(-10, 10)
+        )
+    
+        if visualize:
+            self.visualize_interaction(i, j, "After")
+        
     def reset_layer(self, index: int):
         layers = self.dataset.layers
 
